@@ -1,0 +1,2457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>DOT — Chat & Compete</title>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<style>
+:root{
+  --bg:#0d0f1f;--panel:rgba(255,255,255,.06);--panel-solid:#171a33;
+  --border:rgba(255,255,255,.13);--text:#eef0ff;--muted:#9aa0c0;
+  --accent:#7c5cff;--accent2:#ff5c8a;--bubble-other:rgba(255,255,255,.09);
+  --shadow:0 18px 50px rgba(0,0,0,.45);
+}
+body.light{
+  --bg:#eef0fa;--panel:rgba(255,255,255,.75);--panel-solid:#ffffff;
+  --border:rgba(20,22,45,.12);--text:#14162b;--muted:#666c8e;
+  --bubble-other:rgba(20,22,45,.07);--shadow:0 18px 50px rgba(60,70,120,.18);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  background:var(--bg);color:var(--text);overflow:hidden;transition:background .35s,color .35s;
+}
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(circle at 12% 8%,rgba(124,92,255,.38),transparent 42%),
+    radial-gradient(circle at 88% 88%,rgba(255,92,138,.30),transparent 42%),
+    radial-gradient(circle at 75% 12%,rgba(0,212,255,.18),transparent 38%);
+  transition:opacity .35s;
+}
+body.light::before{opacity:.55;}
+.hidden{display:none!important;}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+input,textarea{font-family:inherit;}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-thumb{background:rgba(140,140,190,.35);border-radius:8px;}
+::-webkit-scrollbar-track{background:transparent;}
+.screen{position:fixed;inset:0;z-index:1;display:flex;flex-direction:column;}
+
+/* LOBBY */
+#lobby{align-items:center;justify-content:center;padding:20px;overflow-y:auto;}
+.card{
+  width:100%;max-width:440px;background:var(--panel);backdrop-filter:blur(24px);
+  -webkit-backdrop-filter:blur(24px);border:1px solid var(--border);border-radius:26px;
+  padding:30px 26px;box-shadow:var(--shadow);animation:pop .5s cubic-bezier(.2,1.2,.4,1);
+}
+@keyframes pop{from{opacity:0;transform:translateY(18px) scale(.96)}to{opacity:1;transform:none}}
+.logo{font-size:42px;font-weight:900;letter-spacing:-2px;text-align:center;line-height:1;}
+.logo span{background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent;}
+.sub{text-align:center;color:var(--muted);font-size:13.5px;margin:8px 0 24px;}
+label{display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:16px 0 8px;}
+input[type=text]{width:100%;padding:13px 15px;border-radius:14px;background:var(--panel);border:1px solid var(--border);color:var(--text);font-size:15px;outline:none;transition:.2s;}
+input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,92,255,.2);}
+.avatar-picker{display:flex;flex-wrap:wrap;gap:8px;}
+.av-opt{width:46px;height:46px;font-size:24px;border-radius:14px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;transition:.18s;}
+.av-opt:hover{transform:translateY(-2px) scale(1.06);}
+.av-opt.sel{border-color:var(--accent);background:rgba(124,92,255,.22);transform:scale(1.06);}
+.btn{padding:14px 18px;border-radius:14px;background:var(--panel);border:1px solid var(--border);font-weight:700;font-size:15px;color:var(--text);transition:.18s;flex:1;}
+.btn:hover{transform:translateY(-2px);border-color:var(--accent);}
+.btn:active{transform:translateY(0);}
+.btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;box-shadow:0 10px 26px rgba(124,92,255,.4);}
+.btn.small{padding:10px 14px;font-size:13.5px;flex:none;}
+.btn-row{display:flex;gap:10px;margin-top:26px;}
+.code-input{text-transform:uppercase;letter-spacing:6px;text-align:center;font-weight:800;font-size:20px!important;}
+#joinArea{margin-top:14px;display:flex;flex-direction:column;gap:10px;animation:pop .3s;}
+.status{margin-top:16px;font-size:13px;color:var(--muted);text-align:center;min-height:18px;}
+.status.err{color:#ff6b8a;}
+
+/* CHAT */
+.topbar{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--panel);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border);z-index:5;}
+.brand{font-weight:900;font-size:20px;letter-spacing:-1px;}
+.brand span{background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent;}
+.room-info{display:flex;align-items:center;gap:7px;margin-left:auto;margin-right:auto;background:var(--panel);border:1px solid var(--border);padding:6px 12px;border-radius:20px;font-size:12.5px;font-weight:700;letter-spacing:1px;}
+.dot{width:8px;height:8px;border-radius:50%;background:#f0b429;box-shadow:0 0 8px #f0b429;}
+.dot.on{background:#22d67a;box-shadow:0 0 8px #22d67a;}
+.dot.off{background:#ff5470;box-shadow:0 0 8px #ff5470;}
+.top-actions{display:flex;gap:6px;margin-left:auto;}
+.icon-btn{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:17px;background:var(--panel);border:1px solid var(--border);transition:.18s;}
+.icon-btn:hover{transform:translateY(-2px);border-color:var(--accent);}
+.icon-btn.active{background:rgba(124,92,255,.28);border-color:var(--accent);}
+.messages{flex:1;overflow-y:auto;padding:18px 16px 8px;display:flex;flex-direction:column;gap:10px;scroll-behavior:smooth;}
+.sys{align-self:center;font-size:12.5px;color:var(--muted);background:var(--panel);border:1px solid var(--border);padding:6px 14px;border-radius:20px;text-align:center;max-width:85%;}
+.msg{display:flex;gap:8px;align-items:flex-end;max-width:82%;animation:slideIn .28s cubic-bezier(.2,1.1,.4,1);position:relative;}
+@keyframes slideIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.msg.self{align-self:flex-end;flex-direction:row-reverse;}
+.ava{width:34px;height:34px;border-radius:50%;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.wrap{display:flex;flex-direction:column;min-width:0;}
+.msg.self .wrap{align-items:flex-end;}
+.meta{display:flex;gap:7px;align-items:baseline;margin:0 6px 3px;font-size:11px;}
+.nm{font-weight:700;color:var(--muted);}
+.tm{color:var(--muted);opacity:.7;}
+.bubble{padding:10px 14px;border-radius:18px;background:var(--bubble-other);border:1px solid var(--border);font-size:14.6px;line-height:1.45;word-wrap:break-word;overflow-wrap:anywhere;white-space:pre-wrap;}
+.msg.self .bubble{background:linear-gradient(135deg,var(--accent),#a855f7);border:none;color:#fff;border-bottom-right-radius:6px;box-shadow:0 6px 18px rgba(124,92,255,.32);}
+.msg:not(.self) .bubble{border-bottom-left-radius:6px;}
+.bubble a{color:inherit;text-decoration:underline;}
+.rx{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px;}
+.rx-chip{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:2px 9px;font-size:12.5px;display:flex;gap:4px;align-items:center;transition:.15s;}
+.rx-chip:hover{transform:scale(1.1);border-color:var(--accent);}
+.rx-chip b{font-size:11px;color:var(--muted);font-weight:700;}
+.rxbtn{opacity:0;width:28px;height:28px;border-radius:50%;background:var(--panel);border:1px solid var(--border);font-size:12px;display:flex;align-items:center;justify-content:center;transition:.18s;flex-shrink:0;margin-bottom:4px;}
+.msg:hover .rxbtn{opacity:1;}
+@media(hover:none){.rxbtn{opacity:.65;}}
+.typing{height:0;padding:0 22px;font-size:12.5px;color:var(--muted);font-style:italic;transition:.25s;overflow:hidden;}
+.typing.show{height:26px;padding-top:5px;}
+
+/* COMPOSER */
+.composer{display:flex;align-items:flex-end;gap:8px;padding:12px 14px 16px;background:var(--panel);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--border);}
+#input{flex:1;resize:none;max-height:120px;padding:12px 15px;border-radius:18px;background:var(--panel);border:1px solid var(--border);color:var(--text);font-size:15px;outline:none;line-height:1.4;transition:.2s;}
+#input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,92,255,.18);}
+.send-btn{width:46px;height:46px;border-radius:16px;flex-shrink:0;font-size:18px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 8px 20px rgba(124,92,255,.42);transition:.18s;display:flex;align-items:center;justify-content:center;}
+.send-btn:hover{transform:translateY(-2px) scale(1.04);}
+.send-btn:active{transform:scale(.94);}
+
+/* POPOVERS */
+.pop{position:fixed;bottom:88px;left:50%;transform:translateX(-50%);background:var(--panel-solid);border:1px solid var(--border);border-radius:22px;padding:14px;box-shadow:var(--shadow);z-index:60;animation:pop .22s;max-width:min(94vw,420px);max-height:60vh;overflow-y:auto;}
+.pop h4{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:9px;}
+.emoji-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:3px;}
+@media(max-width:420px){.emoji-grid{grid-template-columns:repeat(6,1fr);}}
+.emoji-grid button{font-size:22px;padding:5px;border-radius:11px;transition:.14s;line-height:1;}
+.emoji-grid button:hover{background:var(--panel);transform:scale(1.25);}
+.burst-row{display:flex;gap:6px;justify-content:center;margin-bottom:12px;flex-wrap:wrap;}
+.burst-row button{font-size:26px;width:46px;height:46px;border-radius:14px;background:var(--panel);border:1px solid var(--border);transition:.18s;}
+.burst-row button:hover{transform:translateY(-3px) scale(1.1);border-color:var(--accent);}
+.fun-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.fun-grid button{padding:13px 10px;border-radius:15px;background:var(--panel);border:1px solid var(--border);font-size:13px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:5px;transition:.18s;}
+.fun-grid button:hover{transform:translateY(-3px);border-color:var(--accent);background:rgba(124,92,255,.14);}
+.fun-grid button .ic{font-size:21px;}
+
+/* PANELS */
+.panel{position:fixed;inset:0;z-index:70;background:rgba(8,9,20,.72);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:16px;animation:fade .2s;}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.panel-inner{width:100%;max-width:640px;max-height:94vh;overflow-y:auto;background:var(--panel-solid);border:1px solid var(--border);border-radius:26px;padding:20px;box-shadow:var(--shadow);animation:pop .3s cubic-bezier(.2,1.2,.4,1);}
+.panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.panel-head h2{font-size:18px;font-weight:800;}
+.close-btn{width:36px;height:36px;border-radius:12px;background:var(--panel);border:1px solid var(--border);font-size:16px;transition:.18s;}
+.close-btn:hover{background:rgba(255,84,112,.2);border-color:#ff5470;}
+
+/* DRAW */
+#drawWrap{position:relative;border-radius:18px;overflow:hidden;border:1px solid var(--border);background:#fff;}
+body:not(.light) #drawWrap{background:#12142a;}
+#drawCanvas{display:block;width:100%;height:56vh;touch-action:none;cursor:crosshair;}
+.draw-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px;}
+.swatch{width:32px;height:32px;border-radius:10px;border:2px solid transparent;transition:.15s;}
+.swatch:hover{transform:scale(1.12);}
+.swatch.sel{border-color:var(--text);transform:scale(1.12);}
+.size-btn{width:34px;height:34px;border-radius:10px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;transition:.15s;}
+.size-btn.sel{border-color:var(--accent);background:rgba(124,92,255,.24);}
+.size-btn i{display:block;border-radius:50%;background:currentColor;}
+
+/* GAME GRID */
+.game-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:16px;}
+@media(max-width:480px){.game-grid{grid-template-columns:repeat(3,1fr);}}
+.game-grid button{padding:9px 4px;border-radius:12px;background:var(--panel);border:1px solid var(--border);font-size:10.5px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:3px;transition:.18s;line-height:1.1;text-align:center;}
+.game-grid button .g-ic{font-size:20px;line-height:1;}
+.game-grid button:hover{border-color:var(--accent);transform:translateY(-2px);}
+.game-grid button.active{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent;color:#fff;}
+.game-stage{min-height:280px;padding-top:6px;}
+
+/* SHARED GAME UI */
+.score-bar{display:flex;justify-content:center;gap:16px;font-size:13px;font-weight:700;color:var(--muted);margin-bottom:8px;}
+.score-bar b{color:var(--text);}
+.game-status{text-align:center;font-size:14px;color:var(--muted);margin:10px 0;min-height:20px;font-weight:600;}
+.game-arena{
+  background:var(--panel);border:1px solid var(--border);border-radius:20px;
+  padding:22px 18px;text-align:center;font-size:22px;font-weight:700;min-height:110px;
+  display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;transition:.2s;
+}
+.game-arena.tappable{cursor:pointer;user-select:none;}
+
+/* TTT */
+.ttt-board{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;max-width:300px;margin:0 auto 14px;}
+.ttt-cell{aspect-ratio:1;border-radius:16px;background:var(--panel);border:1px solid var(--border);font-size:44px;font-weight:800;display:flex;align-items:center;justify-content:center;transition:.18s;}
+.ttt-cell:hover:not(.taken){background:rgba(124,92,255,.18);transform:scale(1.04);}
+.ttt-cell.taken{cursor:default;}
+.ttt-cell.x{color:#7c5cff;}
+.ttt-cell.o{color:#ff5c8a;}
+.ttt-cell.win{background:linear-gradient(135deg,rgba(34,214,122,.35),rgba(34,214,122,.15));border-color:#22d67a;}
+
+/* RPS */
+.rps-row{display:flex;gap:10px;justify-content:center;margin:16px 0;}
+.rps-btn{flex:1;max-width:110px;aspect-ratio:1;border-radius:20px;background:var(--panel);border:1px solid var(--border);font-size:38px;transition:.18s;}
+.rps-btn:hover{transform:translateY(-4px) scale(1.05);border-color:var(--accent);}
+.rps-btn.sel{background:linear-gradient(135deg,rgba(124,92,255,.4),rgba(255,92,138,.3));border-color:var(--accent);transform:scale(1.06);}
+.rps-reveal{display:flex;justify-content:center;gap:26px;font-size:52px;margin:10px 0;}
+.rps-reveal .vs{font-size:20px;align-self:center;color:var(--muted);font-weight:800;}
+
+/* CONNECT 4 */
+.c4-board{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;max-width:400px;margin:0 auto 14px;background:linear-gradient(135deg,#1e3a8a,#3b82f6);padding:8px;border-radius:16px;}
+.c4-cell{aspect-ratio:1;border-radius:50%;background:var(--bg);transition:.18s;}
+.c4-cell.r{background:radial-gradient(circle at 30% 30%,#ff6b8a,#c2185b);}
+.c4-cell.y{background:radial-gradient(circle at 30% 30%,#fde047,#f59e0b);}
+.c4-cell.win{outline:3px solid #22d67a;outline-offset:-3px;}
+.c4-col{cursor:pointer;}
+.c4-col:hover .c4-cell:not(.r):not(.y){background:rgba(255,255,255,.18);}
+
+/* MEMORY */
+.mem-board{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-width:340px;margin:0 auto 14px;}
+.mem-card{aspect-ratio:1;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:1px solid var(--border);font-size:32px;display:flex;align-items:center;justify-content:center;transition:.25s;cursor:pointer;color:transparent;}
+.mem-card.flipped,.mem-card.matched{background:var(--panel);color:var(--text);}
+.mem-card.matched{background:rgba(34,214,122,.25);border-color:#22d67a;cursor:default;}
+
+/* HIGHER / LOWER */
+.hl-card{background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:20px;padding:26px;text-align:center;font-size:44px;font-weight:900;color:#fff;margin:0 auto 14px;max-width:200px;box-shadow:0 12px 30px rgba(124,92,255,.4);}
+.hl-row{display:flex;gap:10px;justify-content:center;margin-bottom:14px;}
+.hl-row button{flex:1;max-width:140px;padding:14px;border-radius:16px;background:var(--panel);border:1px solid var(--border);font-size:15px;font-weight:800;transition:.18s;}
+.hl-row button:hover{border-color:var(--accent);transform:translateY(-2px);}
+.hl-row button.sel{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-color:transparent;}
+
+/* COLOR REFLEX */
+.color-arena{display:flex;flex-direction:column;align-items:center;gap:16px;}
+.color-word{font-size:56px;font-weight:900;letter-spacing:2px;text-transform:uppercase;}
+.color-btns{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%;max-width:360px;}
+.color-btns button{padding:16px 8px;border-radius:14px;background:var(--panel);border:2px solid var(--border);font-weight:800;font-size:13px;transition:.15s;text-transform:uppercase;}
+.color-btns button:hover{border-color:var(--accent);transform:translateY(-2px);}
+.color-btns button span{display:block;width:24px;height:24px;border-radius:50%;margin:0 auto 5px;}
+
+/* TYPING RACE */
+.type-target{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;font-size:16px;line-height:1.5;margin-bottom:12px;letter-spacing:.3px;}
+.type-target .ok{color:#22d67a;}
+.type-target .no{color:#ff5470;text-decoration:underline;}
+.type-input{width:100%;padding:14px 16px;border-radius:14px;background:var(--panel);border:2px solid var(--border);color:var(--text);font-size:16px;outline:none;transition:.2s;font-family:ui-monospace,Menlo,Consolas,monospace;}
+.type-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,92,255,.18);}
+
+/* TRIVIA */
+.trivia-q{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:16px;font-size:16px;font-weight:700;margin-bottom:12px;text-align:center;}
+.trivia-opts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+.trivia-opts button{padding:13px;border-radius:13px;background:var(--panel);border:1px solid var(--border);font-weight:700;font-size:14px;transition:.18s;text-align:left;}
+.trivia-opts button:hover{border-color:var(--accent);transform:translateY(-2px);}
+.trivia-opts button.sel{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-color:transparent;}
+.trivia-opts button.right{background:linear-gradient(135deg,rgba(34,214,122,.4),rgba(34,214,122,.2));border-color:#22d67a;}
+.trivia-opts button.wrong{background:linear-gradient(135deg,rgba(255,84,112,.4),rgba(255,84,112,.2));border-color:#ff5470;}
+
+/* WAITING */
+.waiting{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px;z-index:4;pointer-events:none;}
+.waiting .big-code{font-size:38px;font-weight:900;letter-spacing:9px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent;}
+.waiting p{color:var(--muted);font-size:14px;max-width:300px;}
+.pulse-ring{width:74px;height:74px;border-radius:50%;border:3px solid var(--accent);animation:pulse 1.6s ease-out infinite;display:flex;align-items:center;justify-content:center;font-size:30px;}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(124,92,255,.55)}70%{box-shadow:0 0 0 26px rgba(124,92,255,0)}100%{box-shadow:0 0 0 0 rgba(124,92,255,0)}}
+
+/* EFFECTS */
+.burst-emoji{position:fixed;font-size:28px;pointer-events:none;z-index:999;animation:burstUp 1.15s cubic-bezier(.2,.7,.4,1) forwards;}
+@keyframes burstUp{0%{opacity:1;transform:translate(0,0) scale(.4) rotate(0deg);}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(1.5) rotate(var(--rot));}}
+.confetti{position:fixed;width:9px;height:14px;pointer-events:none;z-index:998;border-radius:2px;animation:confFall 2.6s linear forwards;}
+@keyframes confFall{0%{opacity:1;transform:translateY(0) rotate(0deg);}100%{opacity:0;transform:translateY(105vh) rotate(720deg);}}
+.shake{animation:shake .5s;}
+@keyframes shake{0%,100%{transform:translate(0,0)}15%{transform:translate(-11px,4px)}30%{transform:translate(9px,-5px)}45%{transform:translate(-8px,-3px)}60%{transform:translate(7px,5px)}80%{transform:translate(-4px,-2px)}}
+#rxPicker{position:fixed;display:none;gap:3px;background:var(--panel-solid);border:1px solid var(--border);padding:6px;border-radius:16px;box-shadow:var(--shadow);z-index:200;}
+#rxPicker button{font-size:21px;padding:5px;border-radius:10px;transition:.14s;}
+#rxPicker button:hover{background:var(--panel);transform:scale(1.3);}
+</style>
+</head>
+<body>
+
+<!-- LOBBY -->
+<div id="lobby" class="screen">
+  <div class="card">
+    <div class="logo">D<span>O</span>T</div>
+    <p class="sub">Two people. One room. 14 ways to win. ✨</p>
+
+    <label>Your name</label>
+    <input type="text" id="nameInput" maxlength="16" placeholder="e.g. Alex" autocomplete="off">
+
+    <label>Pick an avatar</label>
+    <div class="avatar-picker" id="avatarPicker"></div>
+
+    <div class="btn-row">
+      <button class="btn primary" id="createBtn">🚀 Create room</button>
+      <button class="btn" id="joinBtn">🔑 Join room</button>
+    </div>
+
+    <div id="joinArea" class="hidden">
+      <input type="text" id="codeInput" class="code-input" maxlength="6" placeholder="ABC123" autocomplete="off">
+      <button class="btn primary" id="goJoin">Join</button>
+    </div>
+
+    <div class="status" id="lobbyStatus"></div>
+  </div>
+</div>
+
+<!-- CHAT -->
+<div id="chat" class="screen hidden">
+  <header class="topbar">
+    <div class="brand">D<span>O</span>T</div>
+    <div class="room-info">
+      <span class="dot" id="statusDot"></span>
+      <span id="roomLabel">------</span>
+      <button class="icon-btn" id="copyBtn" style="width:26px;height:26px;font-size:12px;" title="Copy invite">📋</button>
+    </div>
+    <div class="top-actions">
+      <button class="icon-btn" id="soundBtn" title="Sound">🔊</button>
+      <button class="icon-btn" id="themeBtn" title="Theme">🌙</button>
+      <button class="icon-btn" id="leaveBtn" title="Leave">🚪</button>
+    </div>
+  </header>
+
+  <div style="position:relative;flex:1;display:flex;flex-direction:column;min-height:0;">
+    <div class="messages" id="messages"></div>
+    <div class="waiting" id="waiting">
+      <div class="pulse-ring">⏳</div>
+      <div class="big-code" id="waitCode">------</div>
+      <p>Share this code with your friend. They tap <b>Join room</b> and enter it.</p>
+    </div>
+  </div>
+
+  <div class="typing" id="typing"></div>
+
+  <div class="composer">
+    <button class="icon-btn" id="emojiBtn" title="Emoji">😀</button>
+    <button class="icon-btn" id="funBtn" title="Fun stuff">🎲</button>
+    <button class="icon-btn" id="drawBtn" title="Doodle">🎨</button>
+    <button class="icon-btn" id="gameBtn" title="Games">🎮</button>
+    <textarea id="input" rows="1" placeholder="Type a message…" maxlength="1200"></textarea>
+    <button class="send-btn" id="sendBtn">➤</button>
+  </div>
+</div>
+
+<!-- POPOVERS -->
+<div class="pop hidden" id="emojiPop">
+  <h4>Tap to burst 🎉</h4>
+  <div class="burst-row" id="burstRow"></div>
+  <h4>Insert emoji</h4>
+  <div class="emoji-grid" id="emojiGrid"></div>
+</div>
+
+<div class="pop hidden" id="funPop">
+  <h4>Fun stuff</h4>
+  <div class="fun-grid">
+    <button data-fun="dice"><span class="ic">🎲</span>Roll dice</button>
+    <button data-fun="coin"><span class="ic">🪙</span>Flip coin</button>
+    <button data-fun="nudge"><span class="ic">👋</span>Nudge</button>
+    <button data-fun="confetti"><span class="ic">🎊</span>Confetti</button>
+    <button data-fun="question"><span class="ic">💬</span>Question</button>
+    <button data-fun="wyr"><span class="ic">🤔</span>Would you rather</button>
+  </div>
+</div>
+
+<!-- DRAW -->
+<div class="panel hidden" id="drawPanel">
+  <div class="panel-inner">
+    <div class="panel-head">
+      <h2>🎨 Doodle Together</h2>
+      <button class="close-btn" data-close="drawPanel">✕</button>
+    </div>
+    <div id="drawWrap"><canvas id="drawCanvas"></canvas></div>
+    <div class="draw-tools">
+      <div id="swatches" style="display:flex;gap:6px;"></div>
+      <div id="sizes" style="display:flex;gap:6px;"></div>
+      <button class="btn small" id="clearCanvas" style="margin-left:auto;">🗑 Clear</button>
+    </div>
+  </div>
+</div>
+
+<!-- GAMES -->
+<div class="panel hidden" id="gamesPanel">
+  <div class="panel-inner">
+    <div class="panel-head">
+      <h2>🎮 Game Room — 14 Duels</h2>
+      <button class="close-btn" data-close="gamesPanel">✕</button>
+    </div>
+    <div class="game-grid" id="gameGrid"></div>
+    <div class="game-stage" id="gameStage"></div>
+  </div>
+</div>
+
+<div id="rxPicker"></div>
+
+<script>
+/* ============ HELPERS ============ */
+const $  = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const linkify = t => t.replace(/(https?:\/\/[^\s<]+)/g, u => `<a href="${u}" target="_blank" rel="noopener">${u}</a>`);
+const nowTime = ts => new Date(ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+const rand = a => a[Math.floor(Math.random()*a.length)];
+const shuffle = a => { const b = a.slice(); for(let i=b.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [b[i],b[j]]=[b[j],b[i]]; } return b; };
+
+/* ============ SOUND ============ */
+let audioOn = true, actx = null;
+function tone(freq, dur=0.08, type='sine', vol=0.06, delay=0){
+  if(!audioOn) return;
+  try{
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if(actx.state === 'suspended') actx.resume();
+    const t = actx.currentTime + delay;
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(actx.destination);
+    o.start(t); o.stop(t + dur + 0.03);
+  }catch(e){}
+}
+const sfx = {
+  send : () => { tone(660,.06,'sine',.05); tone(920,.07,'sine',.04,.05); },
+  recv : () => { tone(520,.07,'sine',.055); tone(700,.08,'sine',.04,.06); },
+  pop  : () => tone(880,.05,'triangle',.05),
+  tick : () => tone(1200,.03,'square',.03),
+  join : () => [523,659,784,1046].forEach((f,i)=>tone(f,.13,'triangle',.06,i*.08)),
+  win  : () => [523,659,784,1046].forEach((f,i)=>tone(f,.14,'triangle',.07,i*.09)),
+  lose : () => [420,340,260].forEach((f,i)=>tone(f,.15,'sawtooth',.04,i*.1)),
+  nudge: () => { tone(180,.16,'square',.05); tone(140,.18,'square',.04,.1); }
+};
+
+/* ============ ICE ============ */
+const ICE = { config: {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:global.stun.twilio.com:3478' },
+    { urls: 'turn:openrelay.metered.ca:80', username:'openrelayproject', credential:'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443', username:'openrelayproject', credential:'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username:'openrelayproject', credential:'openrelayproject' }
+  ],
+  iceCandidatePoolSize: 10
+}};
+
+/* ============ STATE ============ */
+const state = {
+  name:'You', avatar:'🐱', isHost:false, code:null,
+  peer:null, conn:null, connected:false, uid:0
+};
+const nextId = () => 'm' + (++state.uid) + '-' + Date.now().toString(36);
+
+/* ============ LOBBY ============ */
+const AVATARS = ['🐱','🐶','🦊','🐼','🐸','🦄','🐙','🦁','🐨','🐯','🐵','🐧','🦉','🐝','🐢','🦋'];
+let selectedAvatar = AVATARS[0];
+
+(function buildAvatars(){
+  const wrap = $('#avatarPicker');
+  AVATARS.forEach((a, i) => {
+    const b = document.createElement('button');
+    b.className = 'av-opt' + (i === 0 ? ' sel' : '');
+    b.textContent = a;
+    b.onclick = () => {
+      selectedAvatar = a;
+      $$('.av-opt').forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel');
+      sfx.pop();
+    };
+    wrap.appendChild(b);
+  });
+})();
+
+(function prefill(){
+  const p = new URLSearchParams(location.search);
+  const r = (p.get('room') || '').toUpperCase();
+  if(r.length === 6){
+    $('#joinArea').classList.remove('hidden');
+    $('#codeInput').value = r;
+  }
+})();
+
+$('#createBtn').onclick = () => {
+  if(!validateName()) return;
+  state.isHost = true;
+  lobbyStatus('Connecting to server…');
+  createRoom();
+};
+$('#joinBtn').onclick = () => {
+  $('#joinArea').classList.toggle('hidden');
+  $('#codeInput').focus();
+};
+$('#goJoin').onclick = () => {
+  if(!validateName()) return;
+  const code = $('#codeInput').value.trim().toUpperCase();
+  if(code.length !== 6) return lobbyStatus('Enter a 6-character code.', true);
+  state.isHost = false;
+  lobbyStatus('Connecting…');
+  joinRoom(code);
+};
+$('#codeInput').addEventListener('keydown', e => { if(e.key === 'Enter') $('#goJoin').click(); });
+$('#nameInput').addEventListener('keydown', e => { if(e.key === 'Enter') $('#createBtn').click(); });
+
+function validateName(){
+  const n = $('#nameInput').value.trim();
+  if(!n){ lobbyStatus('Please enter your name first.', true); $('#nameInput').focus(); return false; }
+  state.name = n.slice(0,16);
+  state.avatar = selectedAvatar;
+  return true;
+}
+function lobbyStatus(msg, err){
+  const el = $('#lobbyStatus');
+  el.textContent = msg;
+  el.classList.toggle('err', !!err);
+}
+
+/* ============ NETWORKING ============ */
+function randomCode(){
+  const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let s = '';
+  for(let i=0;i<6;i++) s += c[Math.floor(Math.random()*c.length)];
+  return s;
+}
+
+function createRoom(attempt = 0){
+  const code = randomCode();
+  let peer;
+  try { peer = new Peer('dot-' + code, Object.assign({ debug:1 }, ICE)); }
+  catch(e){ return lobbyStatus('Could not start connection.', true); }
+  state.peer = peer;
+  state.code = code;
+
+  peer.on('open', () => {
+    enterChat();
+    setStatus('waiting');
+    $('#waitCode').textContent = code;
+    $('#roomLabel').textContent = code;
+    sysMsg('Room created! Share code ' + code + ' with your friend.');
+    sysMsg('⚠️ Keep this tab open — the room vanishes if you close it.');
+  });
+
+  peer.on('disconnected', () => {
+    sysMsg('🔄 Reconnecting to the server…');
+    setTimeout(() => {
+      if(state.peer && !state.peer.destroyed){
+        try { state.peer.reconnect(); } catch(e){}
+      }
+    }, 900);
+  });
+
+  peer.on('close', () => {
+    if(!state.connected) sysMsg('⚠️ Room closed. Reload to host again.');
+  });
+
+  peer.on('connection', c => {
+    if(state.conn && state.conn.open){ c.close(); return; }
+    state.conn = c;
+    wireConn(c);
+  });
+
+  peer.on('error', err => {
+    const t = err && err.type;
+    if(t === 'unavailable-id' && attempt < 5){
+      try { peer.destroy(); } catch(e){}
+      createRoom(attempt + 1);
+    } else if(t === 'network' || t === 'server-error' || t === 'socket-error'){
+      sysMsg('🔄 Server hiccup — reconnecting…');
+      setTimeout(() => { try { peer.reconnect(); } catch(e){} }, 1200);
+    } else {
+      lobbyStatus('Connection error: ' + (t || err.message), true);
+    }
+  });
+}
+
+let joinToken = 0;
+let joinTimer = null;
+
+function joinRoom(code, attempt = 0){
+  const token = ++joinToken;
+  const alive = () => token === joinToken;
+  clearTimeout(joinTimer);
+
+  if(state.peer){ try { state.peer.destroy(); } catch(e){} }
+
+  let peer;
+  try { peer = new Peer(Object.assign({ debug:1 }, ICE)); }
+  catch(e){ return lobbyStatus('Could not start connection.', true); }
+
+  state.peer = peer;
+  state.code = code;
+  enterChat();
+  setStatus('waiting');
+  $('#waitCode').textContent = code;
+  $('#roomLabel').textContent = code;
+
+  peer.on('open', () => {
+    if(!alive()) return;
+    sysMsg(attempt === 0
+      ? 'Knocking on room ' + code + '…'
+      : 'Retry ' + attempt + '/6 — looking for room ' + code + '…');
+
+    const c = peer.connect('dot-' + code, { reliable: true });
+    state.conn = c;
+    wireConn(c);
+
+    setTimeout(() => {
+      if(!alive() || state.connected) return;
+      try { c.close(); } catch(e){}
+      retryJoin(code, attempt);
+    }, 12000);
+  });
+
+  peer.on('error', err => {
+    if(!alive()) return;
+    const t = err && err.type;
+    if(['peer-unavailable','network','server-error','socket-error','socket-closed','unavailable-id'].includes(t)){
+      retryJoin(code, attempt);
+    } else {
+      lobbyStatus('Connection error: ' + (t || err.message), true);
+      sysMsg('⚠️ Connection error: ' + (t || err.message));
+    }
+  });
+}
+
+function retryJoin(code, attempt){
+  const MAX = 6;
+  if(attempt >= MAX){
+    lobbyStatus('Room "' + code + '" not found after several tries.', true);
+    sysMsg('❌ Still no room ' + code + '. Ask your friend to keep the page open and re-share the code, then hit Try again.');
+    showRetryButton(code);
+    return;
+  }
+  const delay = 1200 + attempt * 800;
+  sysMsg('Room not ready yet — retrying in ' + (delay/1000).toFixed(1) + 's (' + (attempt+1) + '/' + MAX + ')…');
+  joinTimer = setTimeout(() => joinRoom(code, attempt + 1), delay);
+}
+
+function showRetryButton(code){
+  const w = $('#waiting');
+  w.classList.remove('hidden');
+  if(w.querySelector('#retryJoinBtn')) return;
+  const b = document.createElement('button');
+  b.id = 'retryJoinBtn';
+  b.className = 'btn primary';
+  b.style.cssText = 'margin-top:12px;pointer-events:auto;max-width:180px;';
+  b.textContent = '🔄 Try again';
+  b.onclick = () => { b.remove(); joinRoom(code, 0); };
+  w.appendChild(b);
+}
+
+function clearRetryButton(){
+  const b = document.querySelector('#retryJoinBtn');
+  if(b) b.remove();
+}
+
+function wireConn(c){
+  c.on('open', () => {
+    clearTimeout(joinTimer);
+    clearRetryButton();
+    state.connected = true;
+    setStatus('online');
+    $('#waiting').classList.add('hidden');
+    send({ type:'profile', name: state.name, avatar: state.avatar });
+    sysMsg('🎉 You are connected! Say hi.');
+    sfx.join();
+    confetti(40);
+    if(activeGame && activeGame.refresh) try { activeGame.refresh(); } catch(e){}
+  });
+
+  c.on('data', onData);
+
+  c.on('close', () => {
+    state.connected = false;
+    setStatus('offline');
+    sysMsg('⚠️ Your partner disconnected (they may have closed the tab).');
+    $('#waiting').classList.remove('hidden');
+    $('#waitCode').textContent = state.code || '------';
+  });
+
+  c.on('error', e => console.warn('conn error', e));
+}
+
+function send(obj){
+  if(state.conn && state.conn.open){
+    try { state.conn.send(obj); } catch(e){ console.warn(e); }
+  }
+}
+
+function setStatus(s){
+  const dot = $('#statusDot');
+  dot.className = 'dot' + (s === 'online' ? ' on' : s === 'offline' ? ' off' : '');
+}
+
+/* ============ INCOMING DATA ============ */
+let remoteProfile = { name:'Partner', avatar:'🐶' };
+
+function onData(d){
+  if(!d || !d.type) return;
+  switch(d.type){
+    case 'profile':
+      remoteProfile = { name: d.name || 'Partner', avatar: d.avatar || '🐶' };
+      sysMsg(remoteProfile.avatar + ' ' + remoteProfile.name + ' joined the room.');
+      break;
+    case 'chat':
+      addMsg({ id: d.id, text: d.text, self: false, name: remoteProfile.name, avatar: remoteProfile.avatar, ts: d.ts });
+      sfx.recv();
+      break;
+    case 'typing': showTyping(d.on); break;
+    case 'react': addReaction(d.id, d.emoji, false); sfx.pop(); break;
+    case 'burst': burst(d.emoji, window.innerWidth/2, window.innerHeight - 140); sfx.pop(); break;
+    case 'nudge':
+      sfx.nudge();
+      document.body.classList.add('shake');
+      setTimeout(() => document.body.classList.remove('shake'), 520);
+      sysMsg('👋 ' + remoteProfile.name + ' nudged you!');
+      if(navigator.vibrate) navigator.vibrate(180);
+      break;
+    case 'confetti': confetti(70); sfx.win(); break;
+    case 'draw': drawSegment(d.x0, d.y0, d.x1, d.y1, d.color, d.size); break;
+    case 'clear': clearCanvas(false); break;
+    default:
+      if(activeGame && activeGame.handle){
+        try { activeGame.handle(d.type, d); } catch(e){ console.warn(e); }
+      }
+  }
+}
+
+/* ============ CHAT UI ============ */
+const msgBox = $('#messages');
+
+function enterChat(){
+  $('#lobby').classList.add('hidden');
+  $('#chat').classList.remove('hidden');
+  $('#roomLabel').textContent = state.code;
+  $('#waitCode').textContent = state.code;
+  if(state.connected) $('#waiting').classList.add('hidden');
+}
+
+function sysMsg(text){
+  const el = document.createElement('div');
+  el.className = 'sys';
+  el.textContent = text;
+  msgBox.appendChild(el);
+  scrollDown();
+}
+
+function addMsg({ id, text, self, name, avatar, ts }){
+  const el = document.createElement('div');
+  el.className = 'msg' + (self ? ' self' : '');
+  el.dataset.id = id;
+  el.innerHTML =
+    '<div class="ava">' + esc(avatar) + '</div>' +
+    '<div class="wrap">' +
+      '<div class="meta"><span class="nm">' + esc(name) + '</span><span class="tm">' + nowTime(ts) + '</span></div>' +
+      '<div class="bubble">' + linkify(esc(text)) + '</div>' +
+      '<div class="rx"></div>' +
+    '</div>' +
+    '<button class="rxbtn" title="Add reaction">☺</button>';
+  el.querySelector('.rxbtn').onclick = e => { e.stopPropagation(); openRxPicker(el, id); };
+  msgBox.appendChild(el);
+  scrollDown();
+  return el;
+}
+
+function scrollDown(){ requestAnimationFrame(() => { msgBox.scrollTop = msgBox.scrollHeight; }); }
+
+function sendMessage(){
+  const input = $('#input');
+  const text = input.value.trim();
+  if(!text) return;
+  if(!state.connected){ sysMsg('⚠️ Not connected yet — waiting for your partner.'); return; }
+  const id = nextId();
+  const ts = Date.now();
+  addMsg({ id, text, self:true, name: state.name, avatar: state.avatar, ts });
+  send({ type:'chat', id, text, ts });
+  input.value = '';
+  input.style.height = 'auto';
+  sfx.send();
+  sendTyping(true);
+}
+
+$('#sendBtn').onclick = sendMessage;
+$('#input').addEventListener('keydown', e => {
+  if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); }
+});
+$('#input').addEventListener('input', function(){
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+  sendTyping(true);
+});
+
+let typingTimer = null, lastTypingSent = 0;
+function sendTyping(on){
+  const now = Date.now();
+  if(on){
+    if(now - lastTypingSent > 1200){ lastTypingSent = now; send({ type:'typing', on:true }); }
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(() => send({ type:'typing', on:false }), 1800);
+  } else { send({ type:'typing', on:false }); }
+}
+let remoteTypingTimer = null;
+function showTyping(on){
+  const t = $('#typing');
+  if(on){
+    t.textContent = remoteProfile.avatar + ' ' + remoteProfile.name + ' is typing…';
+    t.classList.add('show');
+    clearTimeout(remoteTypingTimer);
+    remoteTypingTimer = setTimeout(() => t.classList.remove('show'), 3000);
+  } else { t.classList.remove('show'); }
+}
+
+/* ============ REACTIONS ============ */
+const reactions = {};
+const rxPicker = $('#rxPicker');
+const RX_EMOJI = ['❤️','😂','👍','🔥','😮','😢','🎉','💯'];
+let rxTargetId = null;
+
+RX_EMOJI.forEach(e => {
+  const b = document.createElement('button');
+  b.textContent = e;
+  b.onclick = () => { if(rxTargetId) addReaction(rxTargetId, e, true); rxPicker.style.display = 'none'; };
+  rxPicker.appendChild(b);
+});
+
+function openRxPicker(msgEl, id){
+  rxTargetId = id;
+  const r = msgEl.getBoundingClientRect();
+  rxPicker.style.display = 'flex';
+  const w = rxPicker.offsetWidth || 280;
+  rxPicker.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
+  rxPicker.style.top = Math.max(8, r.top - 50) + 'px';
+}
+document.addEventListener('click', e => {
+  if(!rxPicker.contains(e.target)) rxPicker.style.display = 'none';
+});
+
+function addReaction(id, emoji, outgoing){
+  const el = msgBox.querySelector('[data-id="' + id + '"]');
+  if(!el) return;
+  if(!reactions[id]) reactions[id] = {};
+  reactions[id][emoji] = (reactions[id][emoji] || 0) + 1;
+  const box = el.querySelector('.rx');
+  box.innerHTML = '';
+  for(const [em, count] of Object.entries(reactions[id])){
+    const chip = document.createElement('button');
+    chip.className = 'rx-chip';
+    chip.innerHTML = em + ' <b>' + count + '</b>';
+    chip.onclick = () => addReaction(id, em, true);
+    box.appendChild(chip);
+  }
+  if(outgoing){
+    send({ type:'react', id, emoji });
+    sfx.pop();
+    const r = el.getBoundingClientRect();
+    burst(emoji, r.left + r.width/2, r.top, 5);
+  }
+}
+
+/* ============ EFFECTS ============ */
+function burst(emoji, x, y, count = 10){
+  for(let i = 0; i < count; i++){
+    const el = document.createElement('div');
+    el.className = 'burst-emoji';
+    el.textContent = emoji;
+    el.style.left = x + 'px';
+    el.style.top  = y + 'px';
+    el.style.setProperty('--dx', (Math.random()*240 - 120) + 'px');
+    el.style.setProperty('--dy', (-Math.random()*220 - 60) + 'px');
+    el.style.setProperty('--rot', (Math.random()*420 - 210) + 'deg');
+    el.style.animationDelay = (Math.random()*0.15) + 's';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 1400);
+  }
+}
+
+function confetti(count = 60){
+  const colors = ['#7c5cff','#ff5c8a','#22d67a','#ffd166','#4cc9f0','#f72585'];
+  for(let i = 0; i < count; i++){
+    const el = document.createElement('div');
+    el.className = 'confetti';
+    el.style.left = Math.random()*100 + 'vw';
+    el.style.top = '-20px';
+    el.style.background = rand(colors);
+    el.style.animationDelay = (Math.random()*0.7) + 's';
+    el.style.animationDuration = (2 + Math.random()*1.6) + 's';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 4200);
+  }
+}
+
+/* ============ EMOJI POPOVER ============ */
+const BURST_SET = ['❤️','😂','🔥','🎉','👍','😮','💯','🥳'];
+const EMOJI_SET = (
+  '😀😁😂🤣😊😍🥰😘😎🤩🥳😏😢😭😡🤯😴🤔🙄😬🤗🤭' +
+  '👍👎👏🙌🤝🙏💪✌️🤞👋🫶💅' +
+  '❤️🧡💛💚💙💜🖤🤍💖💔✨⭐🌟' +
+  '🔥💯🎉🎊🎁🎈🍕🍔🍟🍩☕🍺' +
+  '🐱🐶🦊🐼🐸🦄🐙🦁🐨🐯🐵🐧' +
+  '⚽🏀🎮🎲🎯🎸🎧🚀🌈☀️🌙⚡'
+).match(/./gu).filter(c => c.trim());
+
+(function buildEmojiPop(){
+  const br = $('#burstRow');
+  BURST_SET.forEach(e => {
+    const b = document.createElement('button');
+    b.textContent = e;
+    b.onclick = () => {
+      burst(e, window.innerWidth/2, window.innerHeight - 160, 14);
+      send({ type:'burst', emoji: e });
+      sfx.pop();
+    };
+    br.appendChild(b);
+  });
+  const grid = $('#emojiGrid');
+  EMOJI_SET.forEach(e => {
+    const b = document.createElement('button');
+    b.textContent = e;
+    b.onclick = () => { const inp = $('#input'); inp.value += e; inp.focus(); };
+    grid.appendChild(b);
+  });
+})();
+
+function togglePop(id){
+  const target = $('#' + id);
+  const wasHidden = target.classList.contains('hidden');
+  $$('.pop').forEach(p => p.classList.add('hidden'));
+  if(wasHidden) target.classList.remove('hidden');
+}
+$('#emojiBtn').onclick = e => { e.stopPropagation(); togglePop('emojiPop'); };
+$('#funBtn').onclick   = e => { e.stopPropagation(); togglePop('funPop'); };
+document.addEventListener('click', e => {
+  if(!e.target.closest('.pop') && !e.target.closest('#emojiBtn') && !e.target.closest('#funBtn')){
+    $$('.pop').forEach(p => p.classList.add('hidden'));
+  }
+});
+
+$$('[data-fun]').forEach(b => {
+  b.onclick = () => {
+    const kind = b.dataset.fun;
+    $$('.pop').forEach(p => p.classList.add('hidden'));
+    if(kind === 'dice'){
+      const n = 1 + Math.floor(Math.random()*6);
+      postBot('🎲 ' + state.name + ' rolled a ' + n + '!');
+    } else if(kind === 'coin'){
+      const r = Math.random() < 0.5 ? 'Heads' : 'Tails';
+      postBot('🪙 ' + state.name + ' flipped a coin: ' + r + '!');
+    } else if(kind === 'nudge'){
+      send({ type:'nudge' });
+      sfx.nudge();
+      document.body.classList.add('shake');
+      setTimeout(() => document.body.classList.remove('shake'), 520);
+      sysMsg('👋 You nudged ' + remoteProfile.name + '!');
+    } else if(kind === 'confetti'){
+      confetti(70); sfx.win();
+      send({ type:'confetti' });
+    } else if(kind === 'question'){
+      postBot('💬 ' + rand(QUESTIONS));
+    } else if(kind === 'wyr'){
+      postBot('🤔 Would you rather: ' + rand(WYR) + '?');
+    }
+  };
+});
+
+function postBot(text){
+  if(!state.connected){ sysMsg('⚠️ Connect with your partner first.'); return; }
+  const id = nextId(), ts = Date.now();
+  addMsg({ id, text, self:true, name: state.name, avatar: state.avatar, ts });
+  send({ type:'chat', id, text, ts });
+  sfx.send();
+}
+
+const QUESTIONS = [
+  "What's a movie you can rewatch forever?",
+  "If you could teleport anywhere right now, where would you go?",
+  "What's the most useless talent you have?",
+  "What's your go-to comfort food?",
+  "Describe your day in exactly 3 emojis.",
+  "What song is stuck in your head right now?",
+  "What's the weirdest dream you remember?",
+  "If you were a superhero, what would your power be?",
+  "What's the best gift you've ever received?",
+  "Coffee or tea — and why?",
+  "What's something you're secretly proud of?",
+  "If your life had a soundtrack, what's the opening song?"
+];
+const WYR = [
+  "explore space or explore the deep ocean",
+  "always be 10 minutes late or always 20 minutes early",
+  "have unlimited free travel or unlimited free food",
+  "talk to animals or speak every language",
+  "never use social media again or never watch another movie",
+  "be able to fly or be invisible",
+  "live in a big city or a tiny village",
+  "know how you die or know when you die",
+  "have a rewind button or a pause button for life",
+  "always be too hot or always be too cold"
+];
+
+/* ============ DOODLE ============ */
+const cv = $('#drawCanvas');
+const ctx = cv.getContext('2d');
+let drawColor = '#7c5cff';
+let drawSize = 4;
+let painting = false, lastPt = null;
+const COLORS = ['#7c5cff','#ff5c8a','#22d67a','#ffd166','#4cc9f0','#f72585','#ffffff','#111111'];
+const SIZES = [2, 4, 8, 16];
+
+(function buildDrawTools(){
+  const sw = $('#swatches');
+  COLORS.forEach((c, i) => {
+    const b = document.createElement('button');
+    b.className = 'swatch' + (i === 0 ? ' sel' : '');
+    b.style.background = c;
+    b.onclick = () => { drawColor = c; $$('.swatch').forEach(x => x.classList.remove('sel')); b.classList.add('sel'); };
+    sw.appendChild(b);
+  });
+  const sz = $('#sizes');
+  SIZES.forEach((s, i) => {
+    const b = document.createElement('button');
+    b.className = 'size-btn' + (i === 1 ? ' sel' : '');
+    b.innerHTML = '<i style="width:' + Math.min(s+4,18) + 'px;height:' + Math.min(s+4,18) + 'px;"></i>';
+    b.onclick = () => { drawSize = s; $$('.size-btn').forEach(x => x.classList.remove('sel')); b.classList.add('sel'); };
+    sz.appendChild(b);
+  });
+})();
+
+function fitCanvas(){
+  const r = cv.getBoundingClientRect();
+  if(r.width === 0) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const old = document.createElement('canvas');
+  old.width = cv.width; old.height = cv.height;
+  if(cv.width) old.getContext('2d').drawImage(cv, 0, 0);
+  cv.width = Math.round(r.width * dpr);
+  cv.height = Math.round(r.height * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if(old.width) ctx.drawImage(old, 0, 0, old.width, old.height, 0, 0, r.width, r.height);
+}
+
+function cpos(e){
+  const r = cv.getBoundingClientRect();
+  return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
+}
+
+function drawSegment(x0, y0, x1, y1, color, size){
+  const r = cv.getBoundingClientRect();
+  if(!r.width) return;
+  ctx.beginPath();
+  ctx.moveTo(x0 * r.width, y0 * r.height);
+  ctx.lineTo(x1 * r.width, y1 * r.height);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = size;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.stroke();
+}
+
+cv.addEventListener('pointerdown', e => {
+  painting = true;
+  cv.setPointerCapture(e.pointerId);
+  lastPt = cpos(e);
+  drawSegment(lastPt.x, lastPt.y, lastPt.x + 0.0001, lastPt.y, drawColor, drawSize);
+});
+cv.addEventListener('pointermove', e => {
+  if(!painting) return;
+  const p = cpos(e);
+  drawSegment(lastPt.x, lastPt.y, p.x, p.y, drawColor, drawSize);
+  send({ type:'draw', x0:lastPt.x, y0:lastPt.y, x1:p.x, y1:p.y, color:drawColor, size:drawSize });
+  lastPt = p;
+});
+['pointerup','pointercancel','pointerleave'].forEach(ev =>
+  cv.addEventListener(ev, () => { painting = false; lastPt = null; })
+);
+
+function clearCanvas(broadcast = true){
+  const r = cv.getBoundingClientRect();
+  ctx.clearRect(0, 0, r.width, r.height);
+  if(broadcast) send({ type:'clear' });
+}
+$('#clearCanvas').onclick = () => clearCanvas(true);
+$('#drawBtn').onclick = () => { $('#drawPanel').classList.remove('hidden'); setTimeout(fitCanvas, 40); };
+window.addEventListener('resize', () => {
+  if(!$('#drawPanel').classList.contains('hidden')) fitCanvas();
+});
+
+/* ==========================================================
+   GAMES — 14 COMPETITIVE DUELS
+========================================================== */
+const gameScores = {};
+
+function ensureScore(id){ if(!gameScores[id]) gameScores[id] = { me:0, them:0 }; return gameScores[id]; }
+function addScore(id, who){
+  const s = ensureScore(id);
+  s[who]++;
+  const me = document.getElementById('score-'+id+'-me');
+  const them = document.getElementById('score-'+id+'-them');
+  if(me) me.textContent = s.me;
+  if(them) them.textContent = s.them;
+}
+function scoreHTML(id){
+  const s = ensureScore(id);
+  return '<div class="score-bar"><span>You <b id="score-'+id+'-me">'+s.me+'</b></span><span>—</span><span><b id="score-'+id+'-them">'+s.them+'</b> Them</span></div>';
+}
+
+const GAMES = [
+  { id:'ttt',      name:'Tic-Tac-Toe', icon:'❌⭕' },
+  { id:'rps',      name:'Rock Paper',   icon:'✊✋✌️' },
+  { id:'reaction', name:'Reaction',     icon:'⚡' },
+  { id:'scramble', name:'Scramble',     icon:'🔤' },
+  { id:'math',     name:'Math Sprint',  icon:'➗' },
+  { id:'trivia',   name:'Trivia',       icon:'🧠' },
+  { id:'memory',   name:'Memory',       icon:'🧩' },
+  { id:'guess',    name:'Number Guess', icon:'🎯' },
+  { id:'typing',   name:'Typing Race',  icon:'⌨️' },
+  { id:'dice',     name:'Dice Battle',  icon:'🎲' },
+  { id:'coin',     name:'Coin Flip',    icon:'🪙' },
+  { id:'color',    name:'Color Reflex', icon:'🌈' },
+  { id:'hl',       name:'Higher/Lower', icon:'📈' },
+  { id:'c4',       name:'Connect 4',    icon:'🔴🟡' }
+];
+
+let activeGame = null;
+
+function mountGame(id){
+  const stage = document.getElementById('gameStage');
+  if(!stage) return;
+  if(activeGame && activeGame.unmount) try { activeGame.unmount(); } catch(e){}
+  activeGame = games[id] || null;
+  stage.innerHTML = '';
+  if(!activeGame){ stage.innerHTML = '<div class="game-status">Unknown game.</div>'; return; }
+  try { activeGame.build(stage); } catch(e){ console.error(e); stage.innerHTML = '<div class="game-status">Error loading game.</div>'; }
+  document.querySelectorAll('#gameGrid button').forEach(b => b.classList.toggle('active', b.dataset.game === id));
+}
+
+(function buildGameGrid(){
+  const grid = $('#gameGrid');
+  GAMES.forEach(g => {
+    const b = document.createElement('button');
+    b.dataset.game = g.id;
+    b.innerHTML = '<span class="g-ic">' + g.icon + '</span>' + g.name;
+    b.onclick = () => { mountGame(g.id); sfx.pop(); };
+    grid.appendChild(b);
+  });
+})();
+
+$('#gameBtn').onclick = () => {
+  $('#gamesPanel').classList.remove('hidden');
+  if(!activeGame) mountGame('ttt');
+};
+$$('[data-close]').forEach(b => { b.onclick = () => $('#' + b.dataset.close).classList.add('hidden'); });
+$$('.panel').forEach(p => { p.addEventListener('click', e => { if(e.target === p) p.classList.add('hidden'); }); });
+
+/* ---------- GAME DEFINITIONS ---------- */
+const games = {};
+
+/* ---------- 1. TIC-TAC-TOE ---------- */
+games.ttt = (function(){
+  const board = Array(9).fill(null);
+  let turn = 'X', over = false, stage = null;
+  const mySymbol = () => state.isHost ? 'X' : 'O';
+  const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+  function build(st){
+    stage = st;
+    stage.innerHTML = scoreHTML('ttt') +
+      '<div class="game-status" id="tttStatus">Ready…</div>' +
+      '<div class="ttt-board" id="tttBoard"></div>' +
+      '<div style="text-align:center;margin-top:8px;"><button class="btn small" id="tttReset">🔄 New round</button></div>';
+    const b = stage.querySelector('#tttBoard');
+    for(let i = 0; i < 9; i++){
+      const cell = document.createElement('button');
+      cell.className = 'ttt-cell'; cell.dataset.i = i;
+      cell.onclick = () => click(i);
+      b.appendChild(cell);
+    }
+    stage.querySelector('#tttReset').onclick = () => { reset(true); sfx.pop(); };
+    render();
+  }
+
+  function click(i){
+    if(over || !state.connected) return;
+    if(turn !== mySymbol()) return;
+    if(board[i]) return;
+    board[i] = mySymbol();
+    send({ type:'ttt-move', index:i, symbol: mySymbol() });
+    turn = mySymbol() === 'X' ? 'O' : 'X';
+    sfx.pop(); render(); check();
+  }
+
+  function handle(type, d){
+    if(type === 'ttt-move'){ if(over || board[d.index]) return; board[d.index] = d.symbol; turn = d.symbol === 'X' ? 'O' : 'X'; sfx.pop(); render(); check(); }
+    else if(type === 'ttt-reset'){ reset(false); }
+  }
+
+  function check(){
+    for(const [a,b,c] of LINES){
+      if(board[a] && board[a] === board[b] && board[a] === board[c]){
+        over = true; render([a,b,c]);
+        if(board[a] === mySymbol()){ addScore('ttt','me'); sfx.win(); confetti(50); }
+        else { addScore('ttt','them'); sfx.lose(); }
+        const s = stage.querySelector('#tttStatus');
+        if(s) s.textContent = board[a] === mySymbol() ? '🏆 You win!' : '😅 You lose!';
+        return;
+      }
+    }
+    if(board.every(Boolean)){
+      over = true; sfx.pop();
+      const s = stage.querySelector('#tttStatus');
+      if(s) s.textContent = "🤝 It's a draw!";
+      return;
+    }
+    render();
+  }
+
+  function render(winLine){
+    if(!stage) return;
+    const cells = stage.querySelectorAll('.ttt-cell');
+    board.forEach((v, i) => {
+      const el = cells[i]; if(!el) return;
+      el.textContent = v === 'X' ? '✕' : v === 'O' ? '◯' : '';
+      el.className = 'ttt-cell' + (v ? ' taken ' + v.toLowerCase() : '');
+      if(winLine && winLine.includes(i)) el.classList.add('win');
+    });
+    const s = stage.querySelector('#tttStatus');
+    if(s && !over){
+      s.textContent = !state.connected ? 'Waiting for partner…'
+        : (turn === mySymbol() ? '👉 Your turn (' + mySymbol() + ')' : "⏳ Partner's turn…");
+    }
+  }
+
+  function reset(broadcast = true){
+    board.fill(null); turn = 'X'; over = false;
+    if(broadcast) send({ type:'ttt-reset' });
+    render();
+  }
+
+  return { build, handle, reset, refresh: render };
+})();
+
+/* ---------- 2. ROCK PAPER SCISSORS ---------- */
+games.rps = (function(){
+  let myPick = null, theirPick = null, revealed = false, stage = null;
+  const ICON = { rock:'✊', paper:'✋', scissors:'✌️' };
+
+  function build(st){
+    stage = st;
+    stage.innerHTML = scoreHTML('rps') +
+      '<div class="game-status" id="rpsStatus">Pick your weapon!</div>' +
+      '<div class="rps-reveal" id="rpsReveal"><span>❔</span><span class="vs">VS</span><span>❔</span></div>' +
+      '<div class="rps-row">' +
+        '<button class="rps-btn" data-rps="rock">✊</button>' +
+        '<button class="rps-btn" data-rps="paper">✋</button>' +
+        '<button class="rps-btn" data-rps="scissors">✌️</button>' +
+      '</div>' +
+      '<div style="text-align:center;margin-top:8px;"><button class="btn small" id="rpsReset">🔄 Next round</button></div>';
+    stage.querySelectorAll('.rps-btn').forEach(b => { b.onclick = () => pick(b.dataset.rps); });
+    stage.querySelector('#rpsReset').onclick = () => { reset(true); sfx.pop(); };
+    render();
+  }
+
+  function pick(choice){
+    if(myPick || revealed || !state.connected) return;
+    myPick = choice;
+    send({ type:'rps-pick', choice });
+    sfx.pop(); render(); maybeReveal();
+  }
+
+  function handle(type, d){
+    if(type === 'rps-pick'){ if(theirPick) return; theirPick = d.choice; render(); maybeReveal(); }
+    else if(type === 'rps-reset'){ reset(false); }
+  }
+
+  function maybeReveal(){ if(myPick && theirPick && !revealed){ revealed = true; setTimeout(reveal, 450); } }
+
+  function reveal(){
+    if(!stage) return;
+    const my = myPick, th = theirPick;
+    const rv = stage.querySelector('#rpsReveal');
+    if(rv) rv.innerHTML = '<span>' + ICON[my] + '</span><span class="vs">VS</span><span>' + ICON[th] + '</span>';
+    const s = stage.querySelector('#rpsStatus');
+    let res;
+    if(my === th) res = 'draw';
+    else if((my === 'rock' && th === 'scissors') || (my === 'paper' && th === 'rock') || (my === 'scissors' && th === 'paper')) res = 'win';
+    else res = 'lose';
+    if(res === 'win'){ addScore('rps','me'); sfx.win(); confetti(40); if(s) s.textContent = '🏆 You win this round!'; }
+    else if(res === 'lose'){ addScore('rps','them'); sfx.lose(); if(s) s.textContent = '😅 You lose this round!'; }
+    else { sfx.pop(); if(s) s.textContent = "🤝 It's a tie!"; }
+    stage.querySelectorAll('.rps-btn').forEach(b => b.disabled = true);
+  }
+
+  function reset(broadcast = true){
+    myPick = null; theirPick = null; revealed = false;
+    if(broadcast) send({ type:'rps-reset' });
+    if(!stage) return;
+    stage.querySelectorAll('.rps-btn').forEach(b => { b.disabled = false; b.classList.remove('sel'); });
+    const rv = stage.querySelector('#rpsReveal');
+    if(rv) rv.innerHTML = '<span>❔</span><span class="vs">VS</span><span>❔</span>';
+    const s = stage.querySelector('#rpsStatus');
+    if(s) s.textContent = 'Pick your weapon!';
+  }
+
+  function render(){
+    if(!stage) return;
+    stage.querySelectorAll('.rps-btn').forEach(b => b.classList.toggle('sel', b.dataset.rps === myPick));
+    const s = stage.querySelector('#rpsStatus');
+    if(s){
+      if(myPick && !theirPick) s.textContent = '⏳ Waiting for your partner…';
+      else if(!myPick && theirPick) s.textContent = '👉 Your partner has picked. Your turn!';
+    }
+  }
+
+  return { build, handle, reset, refresh: render };
+})();
+
+/* ---------- 3. REACTION DUEL ---------- */
+games.reaction = (function(){
+  let state_ = 'idle', myTime = null, theirTime = null, t0 = 0, resolved = false, stage = null;
+
+  function build(st){
+    stage = st;
+    stage.innerHTML = scoreHTML('reaction') +
+      '<div class="game-status" id="rxnStatus">Press Start. Wait for the flash, then tap!</div>' +
+      '<div class="game-arena tappable" id="rxnArena">Tap "Start"</div>' +
+      '<button class="btn primary" id="rxnStart" style="width:100%;margin-top:12px;">Start round</button>';
+    stage.querySelector('#rxnStart').onclick = startRound;
+    stage.querySelector('#rxnArena').onclick = tap;
+  }
+
+  function startRound(){
+    if(!state.connected){ sysMsg('Connect first'); return; }
+    const delay = 1500 + Math.random() * 2500;
+    send({ type:'rxn-start', delay });
+    beginCountdown(delay);
+  }
+
+  function beginCountdown(delay){
+    state_ = 'waiting'; myTime = theirTime = null; resolved = false;
+    if(!stage) return;
+    const arena = stage.querySelector('#rxnArena');
+    const status = stage.querySelector('#rxnStatus');
+    const btn = stage.querySelector('#rxnStart');
+    if(arena){ arena.textContent = 'Wait…'; arena.style.background = 'var(--panel)'; }
+    if(status) status.textContent = 'Wait for the flash…';
+    if(btn) btn.disabled = true;
+    setTimeout(() => {
+      if(state_ !== 'waiting') return;
+      state_ = 'ready';
+      if(arena){ arena.textContent = 'TAP!'; arena.style.background = 'linear-gradient(135deg,#22d67a,#16a34a)'; }
+      t0 = performance.now();
+      sfx.pop();
+    }, delay);
+  }
+
+  function tap(){
+    if(state_ !== 'ready') return;
+    const t = Math.round(performance.now() - t0);
+    myTime = t; state_ = 'done';
+    send({ type:'rxn-tap', time: t });
+    if(stage){
+      const arena = stage.querySelector('#rxnArena');
+      if(arena){ arena.textContent = t + ' ms'; arena.style.background = 'var(--panel)'; }
+    }
+    update();
+  }
+
+  function handle(type, d){
+    if(type === 'rxn-start') beginCountdown(d.delay);
+    else if(type === 'rxn-tap'){ theirTime = d.time; update(); }
+  }
+
+  function update(){
+    if(myTime !== null && theirTime !== null && !resolved && stage){
+      resolved = true;
+      const status = stage.querySelector('#rxnStatus');
+      const btn = stage.querySelector('#rxnStart');
+      let msg = '';
+      if(myTime < theirTime){ addScore('reaction','me'); sfx.win(); msg = '🏆 You were faster!'; }
+      else if(myTime > theirTime){ addScore('reaction','them'); sfx.lose(); msg = '😅 They were faster!'; }
+      else { sfx.pop(); msg = "🤝 Tie!"; }
+      if(status) status.textContent = 'You ' + myTime + 'ms vs Them ' + theirTime + 'ms — ' + msg;
+      if(btn){ btn.disabled = false; btn.textContent = 'Play again'; }
+      state_ = 'idle';
+    }
+  }
+
+  return { build, handle };
+})();
+
+/* ---------- 4. WORD SCRAMBLE ---------- */
+const SCRAMBLE_WORDS = ['planets','guitar','rocket','diamond','wizard','penguin','volcano','sandwich','keyboard','elephant','triangle','festival','mountain','chocolate','dolphin'];
+games.scramble = (function(){
+  let word = '', solved = false, stage = null, mySolved = false, theirSolved = false;
+
+  function build(st){
+    stage = st;
+    stage.innerHTML = scoreHTML('scramble') +
+      '<div class="game-status" id="scrStatus">Waiting for your partner to send a word…</div>' +
+      '<div class="game-arena" id="scrWord" style="font-size:32px;letter-spacing:8px;font-weight:900;">—</div>' +
+      '<input type="text" class="type-input" id="scrInput" placeholder="Type your answer…" autocomplete="off" style="margin-top:12px;">' +
+      '<button class="btn primary" id="scrNew" style="width:100%;margin-top:8px;">Send a new word</button>';
+    stage.querySelector('#scrNew').onclick = newWord;
+    const inp = stage.querySelector('#scrInput');
+    inp.addEventListener('input', trySolve);
+    inp.addEventListener('keydown', e => { if(e.key === 'Enter') trySolve(); });
+  }
+
+  function newWord(){
+    if(!state.connected){ sysMsg('Connect first'); return; }
+    const w = rand(SCRAMBLE_WORDS);
+    const scrambled = shuffle(w.split('')).join('').toUpperCase();
+    send({ type:'scr-word', word: w, scrambled });
+    word = w; solved = false; mySolved = false; theirSolved = false;
+    if(stage){
+      const wEl = stage.querySelector('#scrWord');
+      if(wEl) wEl.textContent = scrambled;
+      const status = stage.querySelector('#scrStatus');
+      if(status) status.textContent = 'First to unscramble wins!';
+      const inp = stage.querySelector('#scrInput');
+      if(inp){ inp.value = ''; inp.disabled = false; inp.focus(); }
+    }
+    sfx.pop();
+  }
+
+  function trySolve(){
+    if(!stage || solved || !word) return;
+    const inp = stage.querySelector('#scrInput');
+    if(!inp) return;
+    if(inp.value.trim().toLowerCase() === word && !mySolved){
+      mySolved = true; solved = true;
+      send({ type:'scr-solved' });
+      addScore('scramble','me'); sfx.win(); confetti(40);
+      const status = stage.querySelector('#scrStatus');
+      if(status) status.textContent = '🏆 You got it — ' + word.toUpperCase();
+      inp.disabled = true;
+    }
+  }
+
+  function handle(type, d){
+    if(type === 'scr-word'){
+      word = d.word; solved = false; mySolved = false; theirSolved = false;
+      if(stage){
+        const wEl = stage.querySelector('#scrWord');
+        if(wEl) wEl.textContent = d.scrambled;
+        const status = stage.querySelector('#scrStatus');
+        if(status) status.textContent = 'First to unscramble wins!';
+        const inp = stage.querySelector('#scrInput');
+        if(inp){ inp.value = ''; inp.disabled = false; inp.focus(); }
+      }
+      sfx.recv();
+    } else if(type === 'scr-solved'){
+      theirSolved = true; solved = true;
+      addScore('scramble','them'); sfx.lose();
+      if(stage){
+        const status = stage.querySelector('#scrStatus');
+        if(status) status.textContent = '😅 They got it — ' + word.toUpperCase();
+        const inp = stage.querySelector('#scrInput');
+        if(inp) inp.disabled = true;
+      }
+    }
+  }
+
+  return { build, handle };
+})();
+
+/* ---------- 5. MATH SPRINT ---------- */
+games.math = (function(){
+  let answer = 0, solved = false, stage = null, problem = '';
+
+  function build(st){
+    stage = st;
+    stage.innerHTML = scoreHTML('math') +
+      '<div class="game-status" id="mathStatus">Send a problem to begin.</div>' +
+      '<div class="game-arena" id="mathQ" style="font-size:36px;font-weight:900;">—</div>' +
+      '<input type="text" class="type-input" id="mathInput" placeholder="Your answer…" inputmode="numeric" autocomplete="off" style="margin-top:12px;">' +
+      '<button class="btn primary" id="mathNew" style="width:100%;margin-top:8px;">Send a new problem</button>';
+    stage.querySelector('#mathNew').onclick = newProblem;
+    const inp = stage.querySelector('#mathInput');
+    inp.addEventListener('input', trySolve);
+    inp.addEventListener('keydown', e => { if(e.key === 'Enter') trySolve(); });
+  }
+
+  function newProblem(){
+    if(!state.connected){ sysMsg('Connect first'); return; }
+    const ops = ['+','-','×'];
+    const op = rand(ops);
+    let a, b, ans;
+    if(op === '+'){ a = 10 + Math.floor(Math.random()*90); b = 10 + Math.floor(Math.random()*90); ans = a + b; }
+    else if(op === '-'){ a = 30 + Math.floor(Math.random()*70); b = 10 + Math.floor(Math.random()*(a-10)); ans = a - b; }
+    else { a = 3 + Math.floor(Math.random()*10); b = 3 + Math.floor(Math.random()*10); ans = a * b; }
+    problem = a + ' ' + op + ' ' + b;
+    answer = ans; solved = false;
+    send({ type:'math-prob', problem, answer });
+    render();
+    sfx.pop();
+  }
+
+  function render(){
+    if(!stage) return;
+    const q = stage.querySelector('#mathQ');
+    if(q) q.textContent = problem || '—';
+    const status = stage.querySelector('#mathStatus');
+    if(status) status.textContent = 'First to solve wins!';
+    const inp = stage.querySelector('#mathInput');
+    if(inp){ inp.value = ''; inp.disabled = false; inp.focus(); }
+  }
+
+  function trySolve(){
+    if(!stage || solved || !problem) return;
+    const inp = stage.querySelector('#mathInput');
+    if(!inp) return;
+    const v = parseInt(inp.value, 10);
+    if(v === answer){
+      solved = true;
+      send({ type:'math-solved' });
+      addScore('math','me'); sfx.win(); confetti(30);
+      const status = stage.querySelector('#mathStatus');
+      if(status) status.textContent = '🏆 Correct! ' + problem + ' = ' + answer;
+      inp.disabled = true;
+    }
+  }
+
+  function handle(type, d){
+    if(type === 'math-prob'){
+      problem = d.problem; answer = d.answer; solved = false;
+      render();
+      sfx.recv();
+    } else if(type === 'math-solved'){
+      solved = true;
+      addScore('math','them'); sfx.lose();
+      if(stage){
+        const status = stage.querySelector('#mathStatus');
+        if(status) status.textContent = '😅 They solved it — ' + problem + ' = ' + answer;
+        const inp = stage.querySelector('#mathInput');
+        if(inp) inp.disabled = true;
+      }
+    }
+  }
+
+  return { build, handle };
+})();
+
+/* ---------- 6. TRIVIA DUEL ---------- */
+const TRIVIA = [
+  { q:'What planet is known as the Red Planet?', opts:['Venus','Mars','Jupiter','Mercury'], a:1 },
+  { q:'How many continents are there on Earth?', opts:['5','6','7','8'], a:2 },
+  { q:'What is the largest ocean?', opts:['Atlantic','Indian','Arctic','Pacific'], a:3 },
+  { q:'Who painted the Mona Lisa?', opts:['Michelangelo','Raphael','Da Vinci','Donatello'], a:2 },
+  { q:'What is 9 × 6?', opts:['45','54','56','63'], a:1 },
+  { q:'What gas do plants absorb?', opts:['Oxygen','Nitrogen','CO2','Helium'], a:2 },
+  { q:'The Great Wall is in which country?', opts:['Japan','Korea','China','Mongolia'], a:2 },
+  { q:'What is the smallest prime number?', opts:['0','1','2','3'], a:2 },
+  { q:'How many sides does a hexagon have?', opts:['5','6','7','8'], a:1 },
+  { q:'Which animal is the fastest land animal?', opts:['Lion','Cheetah','Horse','Greyhound'], a:1 },
+  { q:'What is H2O commonly known as?', opts:['Salt','Water','Hydrogen','Oxygen'], a:1 },
+  { q:'Who wrote Romeo and Juliet?', opts:['Dickens','Shakespeare','Austen','Hemingway'], a:1 },
+  { q:'What is the capital of France?', opts:['London','Berlin','Madrid','Paris'], a:3 },
+  { q:'How many minutes in an hour?', opts:['30','45','60','90'], a:2 },
+  { q:'Which is a mammal?', opts:['Shark','Dolphin','Octopus','Tuna'], a:1 }
+];
+games.trivia = (function(){
+  let current = null, myPick = -1, theirPick = -1, revealed = false, stage = null;
+
+  function build(st){
+    stage = st;
+    stage.innerHTML = scoreHTML('trivia') +
+      '<div class="game-status" id="trvStatus">Send a question to begin.</div>' +
+      '<div class="trivia-q" id="trvQ">—</div>' +
+      '<div class="trivia-opts" id="trvOpts"></div>' +
+      '<button class="btn primary" id="trvNew" style="width:100%;">Send a question</button>';
+    stage.querySelector('#trvNew').onclick = newQuestion;
+    renderOpts();
+  }
+
+  function newQuestion(){
+    if(!state.connected){ sysMsg('Connect first'); return; }
+    const t = rand(TRIVIA);
+    const shuffled = t.opts.map((o, i) => ({ o, i }));
+    shuffle(shuffled);
+    const correct = shuffled.findIndex(x => x.i === t.a);
+    current = { q: t.q, opts: shuffled.map(x => x.o), a: correct };
+    myPick = -1; theirPick = -1; revealed = false;
+    send({ type:'trv-q', q: current.q, opts: current.opts, a: current.a });
+    renderOpts();
+    if(stage){
+      const status = stage.querySelector('#trvStatus');
+      if(status) status.textContent = 'First correct answer wins!';
+    }
+    sfx.pop();
+  }
+
+  function renderOpts(){
+    if(!stage) return;
+    const qEl = stage.querySelector('#trvQ');
+    const optsEl = stage.querySelector('#trvOpts');
+    if(!current){ if(qEl) qEl.textContent = '—'; if(optsEl) optsEl.innerHTML = ''; return; }
+    if(qEl) qEl.textContent = current.q;
+    if(optsEl){
+      optsEl.innerHTML = '';
+      current.opts.forEach((o, i) => {
+        const b = document.createElement('button');
+        b.textContent = o;
+        b.dataset.i = i;
+        if(myPick === i) b.classList.add('sel');
+        b.onclick = () => pick(i);
+        optsEl.appendChild(b);
+      });
+    }
+    revealOpts();
+  }
+
+  function pick(i){
+    if(revealed || myPick !== -1 || !state.connected) return;
+    myPick = i;
+    send({ type:'trv-pick', index: i });
+    renderOpts();
+    if(current && i === current.a){
+      revealed = true;
+      addScore('trivia','me'); sfx.win(); confetti(30);
+      send({ type:'trv-revealed' });
+      if(stage){
+        const status = stage.querySelector('#trvStatus');
+        if(status) status.textContent = '🏆 Correct!';
+      }
+      revealOpts();
+    } else if(current){
+      // wait for their answer
+      if(stage){
+        const status = stage.querySelector('#trvStatus');
+        if(status) status.textContent = '❌ Wrong — waiting for your partner…';
+      }
+    }
+  }
+
+  function revealOpts(){
+    if(!stage || !current) return;
+    const optsEl = stage.querySelector('#trvOpts');
+    if(!optsEl) return;
+    optsEl.querySelectorAll('button').forEach((b, i) => {
+      b.classList.remove('right','wrong');
+      if(!revealed && myPick === -1) return;
+      if(i === current.a) b.classList.add('right');
+      else if(i === myPick || i === theirPick) b.classList.add('wrong');
+    });
+  }
+
+  function handle(type, d){
+    if(type === 'trv-q'){
+      current = { q: d.q, opts: d.opts, a: d.a };
+      myPick = -1; theirPick = -1; revealed = false;
+      renderOpts();
+      if(stage){
+        const status = stage.querySelector('#trvStatus');
+        if(status) status.textContent = 'First correct answer wins!';
+      }
+      sfx.recv();
+    } else if(type === 'trv-pick'){
+      theirPick = d.index;
+      if(!revealed && theirPick === current.a){
+        revealed = true;
+        addScore('trivia','them'); sfx.lose();
+        if(stage){
+          const status = stage.querySelector('#trvStatus');
+          if(status) status.textContent = '😅 They answered first!';
+        }
+      }
+      revealOpts();
+    } else if(type === 'trv-revealed'){
+      if(!revealed){ revealed = true; addScore('trivia','them'); sfx.lose(); }
+      revealOpts();
+      if(stage){
+        const status = stage.querySelector('#trvStatus');
+        if(status) status.textContent = '😅 They answered first!';
+      }
+    }
+  }
+
+  return { build, handle };
+})();
+
+/* ---------- 7. EMOJI MEMORY ---------- */
+const MEM_EMOJI = ['🍕','🍔','🍟','🍩','🍦','🍪','🍫','🍭'];
+games.memory = (function(){
+  let board = [], flipped = [], matched = 0, myTurn = true, stage = null, busy = false;
+
+  function build(st){
+    stage = st;
+    stage.innerHTML = scoreHTML('memory') +
+      '<div class="game-status" id="memStatus">Click "New game" to start.</div>' +
+      '<div class="mem-board" id="memBoard"></div>' +
+      '<button class="btn primary" id="memNew" style="width:100%;margin-top:8px;">New game</button>';
+    stage.querySelector('#memNew').onclick = newGame;
+    renderBoard();
+  }
+
+  function newGame(){
+    if(!state.connected){ sysMsg('Connect first'); return; }
+    const deck = shuffle(MEM_EMOJI.concat(MEM_EMOJI));
+    const host = state.isHost;
+    myTurn = host;
+    if(host){
+      send({ type:'mem-new', deck });
+    } else {
+      // Joiner requests host to send a new board
+      send({ type:'mem-request-new' });
+      return;
+    }
+    setupBoard(deck);
+  }
+
+  function setupBoard(deck){
+    board = deck.map(e => ({ e, flipped: false, matched: false }));
+    flipped = []; matched = 0; busy = false;
+    if(stage){
+      const status = stage.querySelector('#memStatus');
+      if(status) status.textContent = myTurn ? '👉 Your turn — flip 2 cards' : "⏳ Partner's turn…";
+    }
+    renderBoard();
+  }
+
+  function renderBoard(){
+    if(!stage) return;
+    const b = stage.querySelector('#memBoard');
+    if(!b) return;
+    b.innerHTML = '';
+    board.forEach((c, i) => {
+      const el = document.createElement('button');
+      el.className = 'mem-card';
+      if(c.flipped || c.matched) el.classList.add('flipped');
+      if(c.matched) el.classList.add('matched');
+      el.textContent = (c.flipped || c.matched) ? c.e : '?';
+      el.onclick = () => flip(i);
+      b.appendChild(el);
+    });
+  }
+
+  function flip(i){
+    if(busy || !state.connected || !myTurn) return;
+    if(board[i].flipped || board[i].matched) return;
+    if(flipped.includes(i)) return;
+    board[i].flipped = true;
+    flipped.push(i);
+    send({ type:'mem-flip', index: i });
+    renderBoard();
+    sfx.tick();
+    if(flipped.length === 2) checkPair(true);
+  }
+
+  function checkPair(mySide){
+    busy = true;
+    const [a, b] = flipped;
+    if(board[a].e === board[b].e){
+      setTimeout(() => {
+        board[a].matched = true; board[b].matched = true;
+        matched++;
+        if(mySide){ addScore('memory','me'); sfx.pop(); }
+        else { addScore('memory','them'); }
+        flipped = [];
+        busy = false;
+        renderBoard();
+        if(matched === 8){
+          confetti(60);
+          if(stage){
+            const status = stage.querySelector('#memStatus');
+            if(status) status.textContent = '🎉 All matched!';
+          }
+        } else if(mySide){
+          // same player continues
+        } else {
+          myTurn = true;
+          if(stage){ const s = stage.querySelector('#memStatus'); if(s) s.textContent = '👉 Your turn'; }
+        }
+      }, 400);
+    } else {
+      setTimeout(() => {
+        board[a].flipped = false; board[b].flipped = false;
+        flipped = [];
+        busy = false;
+        myTurn = !mySide;
+        renderBoard();
+        if(stage){
+          const s = stage.querySelector('#memStatus');
+          if(s) s.textContent = myTurn ? '👉 Your turn' : "⏳ Partner's turn…";
+        }
+      }, 900);
+    }
+  }
+
+  function handle(type, d){
+    if(type === 'mem-new'){ setupBoard(d.deck); sfx.recv(); }
+    else if(type === 'mem-request-new'){ if(state.isHost) newGame(); }
+    else if(type === 'mem-flip'){
+      if(board[d.index].flipped || board[d.index].matched) return;
+      board[d.index].flipped = true;
+      flipped.push(d.index);
+      renderBoard();
+      sfx.tick();
+      if(flipped.length === 2) checkPair(false);
+    }
+  }
+
+  return { build, handle };
+})();
+
+/* ---------- 8. NUMBER GUESS ---------- */
+games.guess = (function(){
+  let secret = 0, myGuess = null, theirGuess = null, revealed = false, stage = null;
+
+  function build(st){
+    stage = st;
+    stage.innerHTML = scoreHTML('guess') +
+      '<div class="game-status" id="gsStatus">Send a secret number (1–100).</div>' +
+      '<input type="text" class="type-input" id="gsInput" placeholder="Your guess (1–100)…" inputmode="numeric" autocomplete="off">' +
+      '<button class="btn primary" id="gsSubmit" style="width:100%;margin-top:8px;">Submit guess</button>' +
+      '<button class="btn" id="gsNew" style="width:100%;margin-top:8px;">New secret number</button>';
+    stage.querySelector('#gsSubmit').onclick = submitGuess;
+    stage.querySelector('#gsNew').onclick = newSecret;
+    const inp = stage.querySelector('#gsInput');
+    inp.addEventListener('keydown', e => { if(e.key === 'Enter') submitGuess(); });
+  }
+
+  function newSecret(){
+    if(!state.connected){ sysMsg('Connect first'); return; }
+    secret = 1 + Math.floor(Math.random()*100);
+    myGuess = null; theirGuess = null; revealed = false;
+    send({ type:'gs-secret' });
+    if(stage){
+      const status = stage.querySelector('#gsStatus');
+      if(status) status.textContent = 'Guess a number between 1 and 100. Closest wins!';
+      const inp = stage.querySelector('#gsInput');
+      if(inp){ inp.value = ''; inp.disabled = false; inp.focus(); }
+    }
+    sfx.pop();
+  }
+
+  function submitGuess(){
+    if(revealed || myGuess !== null || !state.connected) return;
+    const inp = stage.querySelector('#gsInput');
+    const v = parseInt(inp.value, 10);
+    if(isNaN(v) || v < 1 || v > 100){ return; }
+    myGuess = v;
+    send({ type:'gs-guess', value: v });
+    inp.disabled = true;
+    if(stage){
+      const status = stage.querySelector('#gsStatus');
+      if(status) status.textContent = 'You guessed ' + v + '. Waiting for your partner…';
+    }
+    maybeReveal();
+  }
+
+  function handle(type, d){
+    if(type === 'gs-secret'){
+      myGuess = null; theirGuess = null; revealed = false;
+      if(stage){
+        const status = stage.querySelector('#gsStatus');
+        if(status) status.textContent = 'Guess a number between 1 and 100. Closest wins!';
+        const inp = stage.querySelector('#gsInput');
+        if(inp){ inp.value = ''; inp.disabled = false; inp.focus(); }
+      }
+      sfx.recv();
+    } else if(type === 'gs-guess'){
+      theirGuess = d.value;
+      maybeReveal();
+    }
+  }
+
+  function maybeReveal(){
+    if(myGuess === null || theirGuess === null || revealed || !stage) return;
+    revealed = true;
+    const myDiff = Math.abs(myGuess - secret);
+    const theirDiff = Math.abs(theirGuess - secret);
+    let msg;
+    if(myDiff < theirDiff){ addScore('guess','me'); sfx.win(); msg = '🏆 You were closer!'; }
+    else if(myDiff > theirDiff){ addScore('guess','them'); sfx.lose(); msg = '😅 They were closer!'; }
+    else { sfx.pop(); msg = "🤝 Tie!"; }
+    const status = stage.querySelector('#gsStatus');
+    if(status) status.textContent = 'Secret was ' + secret + '. You ' + myGuess + ' vs Them ' + theirGuess + ' — ' + msg;
+  }
+
+  return { build, handle };
+})();
+
+/* ---------- 9. TYPING RACE ---------- */
+const TYPE_PHRASES = [
+  'The quick brown fox jumps over the lazy dog',
+  'Practice makes perfect every single day',
+  'Coding is fun when the code works',
+  'Never gonna give you up never gonna let you down',
+  'Two friends racing to the finish line',
+  'Pack my box with five dozen liquor jugs'
+];
+games.typing = (function(){
+  let target = '', solved = false, stage = null, done = false;
+
+  function build(st){
+    stage = st;
+    stage.innerHTML = scoreHTML('typing') +
+      '<div class="game-status" id="typStatus">Send a phrase to begin.</div>' +
+      '<div class="type-target" id="typTarget">—</div>' +
+      '<input type="text" class="type-input" id="typInput" placeholder="Start typing…" autocomplete="off" autocorrect="off" spellcheck="false">' +
+      '<button class="btn primary" id="typNew" style="width:100%;margin-top:8px;">Send a phrase</button>';
+    stage.querySelector('#typNew').onclick = newPhrase;
+    const inp = stage.querySelector('#typInput');
+    inp.addEventListener('input', checkProgress);
+    inp.addEventListener('keydown', e => { if(e.key === 'Enter') checkProgress(); });
+  }
+
+  function newPhrase(){
+    if(!state.connected){ sysMsg('Connect first'); return; }
+    const p = rand(TYPE_PHRASES);
+    send({ type:'typ-target', phrase: p });
+    target = p; solved = false; done = false;
+    renderTarget('');
+    if(stage){
+      const inp = stage.querySelector('#typInput');
+      if(inp){ inp.value = ''; inp.disabled = false; inp.focus(); }
+      const status = stage.querySelector('#typStatus');
+      if(status) status.textContent = 'First to type it exactly wins!';
+    }
+    sfx.pop();
+  }
+
+  function renderTarget(typed){
+    if(!stage) return;
+    const el = stage.querySelector('#typTarget');
+    if(!el) return;
+    if(!target){ el.textContent = '—'; return; }
+    let html = '';
+    for(let i = 0; i < target.length; i++){
+      const c = target[i];
+      if(i < typed.length){
+        html += typed[i] === c ? '<span class="ok">' + esc(c) + '</span>' : '<span class="no">' + esc(c) + '</span>';
+      } else {
+        html += esc(c);
+      }
+    }
+    el.innerHTML = html;
+  }
+
+  function checkProgress(){
+    if(!stage || solved || !target) return;
+    const inp = stage.querySelector('#typInput');
+    if(!inp) return;
+    renderTarget(inp.value);
+    if(inp.value === target){
+      solved = true;
+      send({ type:'typ-solved' });
+      addScore('typing','me'); sfx.win(); confetti(30);
+      const status = stage.querySelector('#typStatus');
+      if(status) status.textContent = '🏆 You typed it first!';
+      inp.disabled = true;
+    }
+  }
+
+  function handle(type, d){
+    if(type === 'typ-target'){
+      target = d.phrase; solved = false; done = false;
+      renderTarget('');
+      if(stage){
+        const inp = stage.querySelector('#typInput');
+        if(inp){ inp.value = ''; inp.disabled = false; inp.focus(); }
+        const status = stage.querySelector('#typStatus');
+        if(status) status.textContent = 'First to type it exactly wins!';
+      }
+      sfx.recv();
+    } else if(type === 'typ-solved'){
+      solved = true;
+      addScore('typing','them'); sfx.lose();
+      if(stage){
+        const status = stage.querySelector('#typStatus');
+        if(status) status.textContent = '😅 They typed it first!';
+        const inp = stage.querySelector('#typInput');
+        if(inp) inp.disabled = true;
+      }
+    }
+  }
+
+  return { build, handle };
+})();
+
+/* ---------- 10. DICE BATTLE ---------- */
+games.dice = (function(){
+  let myRoll = null, theirRoll = null, revealed = false, stage = null;
+
+  function build(st){
+    stage = st;
+    stage.innerHTML = scoreHTML('dice') +
+      '<div class="game-status" id="diceStatus">Roll the dice — higher number wins!</div>' +
+      '<div class="game-arena" id="diceArena" style="font-size:64px;">🎲</div>' +
+      '<button class="btn primary" id="diceRoll" style="width:100%;margin-top:12px;">Roll!</button>';
+    stage.querySelector('#diceRoll').onclick = roll;
+  }
+
+  function roll(){
+    if(!state.connected || myRoll !== null) return;
+    myRoll = 1 + Math.floor(Math.random()*6);
+    send({ type:'dice-roll', value: myRoll });
+    if(stage){
+      const a = stage.querySelector('#diceArena');
+      if(a) a.textContent = '🎲 ' + myRoll;
+      const btn = stage.querySelector('#diceRoll');
+      if(btn) btn.disabled = true;
+      const status = stage.querySelector('#diceStatus');
+      if(status) status.textContent = 'You rolled ' + myRoll + '. Waiting for your partner…';
+    }
+    sfx.pop();
+    maybeReveal();
+  }
+
+  function handle(type, d){
+    if(type === 'dice-roll'){
+      theirRoll = d.value;
+      maybeReveal();
+    }
+  }
+
+  function maybeReveal(){
+    if(myRoll === null || theirRoll === null || revealed || !stage) return;
+    revealed = true;
+    let msg;
+    if(myRoll > theirRoll){ addScore('dice','me'); sfx.win(); msg = '🏆 You win!'; }
+    else if(myRoll < theirRoll){ addScore('dice','them'); sfx.lose(); msg = '😅 They win!'; }
+    else { sfx.pop(); msg = "🤝 Tie!"; }
+    const status = stage.querySelector('#diceStatus');
+    if(status) status.textContent = 'You ' + myRoll + ' vs Them ' + theirRoll + ' — ' + msg;
+    setTimeout(() => {
+      myRoll = null; theirRoll = null; revealed = false;
+      if(stage){
+        const a = stage.querySelector('#diceArena');
+        if(a) a.textContent = '🎲';
+        const btn = stage.querySelector('#diceRoll');
+        if(btn) btn.disabled = false;
+      }
+    }, 2200);
+  }
+
+  return { build, handle };
+})();
+
+/* ---------- 11. COIN FLIP ---------- */
+games.coin = (function(){
+  let myPick = null, theirPick = null, flipResult = null, revealed = false, stage = null;
+
+  function build(st){
+    stage = st;
+    stage.innerHTML = scoreHTML('coin') +
+      '<div class="game-status" id="coinStatus">Pick heads or tails!</div>' +
+      '<div class="game-arena" id="coinArena" style="font-size:64px;">🪙</div>' +
+      '<div class="rps-row" style="margin-top:12px;">' +
+        '<button class="rps-btn" data-coin="heads" style="font-size:22px;">HEADS</button>' +
+        '<button class="rps-btn" data-coin="tails" style="font-size:22px;">TAILS</button>' +
+      '</div>' +
+      '<button class="btn primary" id="coinFlip" style="width:100%;margin-top:8px;" disabled>Flip!</button>';
+    stage.querySelectorAll('.rps-btn').forEach(b => { b.onclick = () => pick(b.dataset.coin); });
+    stage.querySelector('#coinFlip').onclick = doFlip;
+  }
+
+  function pick(c){
+    if(myPick || !state.connected) return;
+    myPick = c;
+    send({ type:'coin-pick', choice: c });
+    if(stage){
+      stage.querySelectorAll('.rps-btn').forEach(b => b.classList.toggle('sel', b.dataset.coin === c));
+      const status = stage.querySelector('#coinStatus');
+      if(status) status.textContent = 'You picked ' + c.toUpperCase() + '. Waiting for partner…';
+    }
+    sfx.pop();
+    maybeEnableFlip();
+  }
+
+  function maybeEnableFlip(){
+    if(myPick && theirPick && !revealed && stage){
+      // Host does the flip and broadcasts
+      if(state.isHost){
+        const result = Math.random() < 0.5 ? 'heads' : 'tails';
+        send({ type:'coin-result', result });
+        applyResult(result);
+      }
+    }
+  }
+
+  function doFlip(){ /* handled automatically */ }
+
+  function applyResult(result){
+    flipResult = result; revealed = true;
+    const winner = (myPick === result) ? 'me' : 'them';
+    if(winner === 'me'){ addScore('coin','me'); sfx.win(); confetti(30); }
+    else { addScore('coin','them'); sfx.lose(); }
+    if(stage){
+      const a = stage.querySelector('#coinArena');
+      if(a) a.textContent = result === 'heads' ? '👑' : '🪙';
+      const status = stage.querySelector('#coinStatus');
+      if(status) status.textContent = 'It landed on ' + result.toUpperCase() + '! ' + (winner === 'me' ? '🏆 You win!' : '😅 They win!');
+    }
+    setTimeout(reset, 2200);
+  }
+
+  function reset(){
+    myPick = null; theirPick = null; flipResult = null; revealed = false;
+    if(!stage) return;
+    stage.querySelectorAll('.rps-btn').forEach(b => b.classList.remove('sel'));
+    const a = stage.querySelector('#coinArena');
+    if(a) a.textContent = '🪙';
+    const status = stage.querySelector('#coinStatus');
+    if(status) status.textContent = 'Pick heads or tails!';
+  }
+
+  function handle(type, d){
+    if(type === 'coin-pick'){
+      theirPick = d.choice;
+      const status = stage ? stage.querySelector('#coinStatus') : null;
+      if(status && myPick) status.textContent = 'Both picked! Flipping…';
+      maybeEnableFlip();
+    } else if(type === 'coin-result'){
+      if(!myPick) return;
+      applyResult(d.result);
+    }
+  }
+
+  return { build, handle };
+})();
+
+/* ---------- 12. COLOR REFLEX (Stroop test) ---------- */
+const STROOP_COLORS = [
+  { name:'RED', css:'#ff4444' },
+  { name:'GREEN', css:'#22d67a' },
+  { name:'BLUE', css:'#4cc9f0' },
+  { name:'YELLOW', css:'#ffd166' },
+  { name:'PURPLE', css:'#a855f7' },
+  { name:'ORANGE', css:'#ff8c42' }
+];
+games.color = (function(){
+  let current = null, solved = false, stage = null;
+
+  function build(st){
+    stage = st;
+    stage.innerHTML = scoreHTML('color') +
+      '<div class="game-status" id="colStatus">Tap the COLOR of the word, not the word itself.</div>' +
+      '<div class="color-arena">' +
+        '<div class="color-word" id="colWord">—</div>' +
+        '<div class="color-btns" id="colBtns"></div>' +
+      '</div>' +
+      '<button class="btn primary" id="colNew" style="width:100%;margin-top:12px;">Send a new word</button>';
+    stage.querySelector('#colNew').onclick = newRound;
+    renderBtns();
+  }
+
+  function renderBtns(){
+    if(!stage) return;
+    const box = stage.querySelector('#colBtns');
+    if(!box) return;
+    box.innerHTML = '';
+    STROOP_COLORS.forEach(c => {
+      const b = document.createElement('button');
+      b.innerHTML = '<span style="background:' + c.css + '"></span>' + c.name;
+      b.dataset.name = c.name;
+      b.onclick = () => guess(c.name);
+      box.appendChild(b);
+    });
+  }
+
+  function newRound(){
+    if(!state.connected){ sysMsg('Connect first'); return; }
+    const wordColor = rand(STROOP_COLORS);
+    let inkColor = rand(STROOP_COLORS);
+    while(inkColor.name === wordColor.name) inkColor = rand(STROOP_COLORS);
+    current = { word: wordColor.name, ink: inkColor.name, inkCss: inkColor.css };
+    send({ type:'col-round', word: current.word, ink: current.ink, inkCss: current.inkCss });
+    solved = false;
+    render();
+    sfx.pop();
+  }
+
+  function render(){
+    if(!stage) return;
+    const w = stage.querySelector('#colWord');
+    if(!w) return;
+    if(!current){ w.textContent = '—'; w.style.color = 'var(--text)'; return; }
+    w.textContent = current.word;
+    w.style.color = current.inkCss;
+    const status = stage.querySelector('#colStatus');
+    if(status) status.textContent = 'Tap the ink color!';
+  }
+
+  function guess(name){
+    if(solved || !current || !state.connected) return;
+    if(name === current.ink){
+      solved = true;
+      send({ type:'col-solved' });
+      addScore('color','me'); sfx.win(); confetti(30);
+      if(stage){
+        const status = stage.querySelector('#colStatus');
+        if(status) status.textContent = '🏆 Correct! Ink was ' + current.ink;
+      }
+    } else {
+      if(stage){
+        const status = stage.querySelector('#colStatus');
+        if(status) status.textContent = '❌ Wrong — try again';
+      }
+    }
+  }
+
+  function handle(type, d){
+    if(type === 'col-round'){
+      current = { word: d.word, ink: d.ink, inkCss: d.inkCss };
+      solved = false;
+      render();
+      sfx.recv();
+    } else if(type === 'col-solved'){
+      solved = true;
+      addScore('color','them'); sfx.lose();
+      if(stage){
+        const status = stage.querySelector('#colStatus');
+        if(status) status.textContent = '😅 They tapped it first! Ink was ' + current.ink;
+      }
+    }
+  }
+
+  return { build, handle };
+})();
+
+/* ---------- 13. HIGHER OR LOWER ---------- */
+games.hl = (function(){
+  let current = 0, next = 0, myGuess = null, theirGuess = null, revealed = false, stage = null, round = 0;
+
+  function build(st){
+    stage = st;
+    stage.innerHTML = scoreHTML('hl') +
+      '<div class="game-status" id="hlStatus">Guess if the next number is higher or lower.</div>' +
+      '<div class="hl-card" id="hlCard">?</div>' +
+      '<div class="hl-row" id="hlRow">' +
+        '<button data-hl="higher">⬆️ Higher</button>' +
+        '<button data-hl="lower">⬇️ Lower</button>' +
+      '</div>' +
+      '<button class="btn primary" id="hlNew" style="width:100%;">Next round</button>';
+    stage.querySelectorAll('[data-hl]').forEach(b => { b.onclick = () => guess(b.dataset.hl); });
+    stage.querySelector('#hlNew').onclick = newRound;
+  }
+
+  function newRound(){
+    if(!state.connected){ sysMsg('Connect first'); return; }
+    const a = 1 + Math.floor(Math.random()*100);
+    let b = 1 + Math.floor(Math.random()*100);
+    while(b === a) b = 1 + Math.floor(Math.random()*100);
+    const diff = b - a;
+    current = a; next = b;
+    myGuess = null; theirGuess = null; revealed = false; round++;
+    send({ type:'hl-round', a, b });
+    render();
+    sfx.pop();
+  }
+
+  function render(){
+    if(!stage) return;
+    const card = stage.querySelector('#hlCard');
+    if(card) card.textContent = current;
+    const status = stage.querySelector('#hlStatus');
+    if(status){
+      if(revealed){
+        const res = next > current ? 'higher' : 'lower';
+        status.textContent = 'The next number was ' + next + ' (' + res + ').';
+      } else {
+        status.textContent = 'Next number — higher or lower than ' + current + '?';
+      }
+    }
+    stage.querySelectorAll('[data-hl]').forEach(b => {
+      b.classList.toggle('sel', myGuess === b.dataset.hl);
+    });
+  }
+
+  function guess(g){
+    if(revealed || myGuess || !state.connected) return;
+    myGuess = g;
+    send({ type:'hl-guess', guess: g });
+    render();
+    sfx.pop();
+    if(theirGuess) reveal();
+  }
+
+  function reveal(){
+    if(revealed || !stage) return;
+    revealed = true;
+    const correct = next > current ? 'higher' : 'lower';
+    if(myGuess === correct){ addScore('hl','me'); sfx.win(); }
+    else { addScore('hl','them'); sfx.lose(); }
+    render();
+  }
+
+  function handle(type, d){
+    if(type === 'hl-round'){
+      current = d.a; next = d.b;
+      myGuess = null; theirGuess = null; revealed = false;
+      render();
+      sfx.recv();
+    } else if(type === 'hl-guess'){
+      theirGuess = d.guess;
+      if(myGuess) reveal();
+    }
+  }
+
+  return { build, handle };
+})();
+
+/* ---------- 14. CONNECT FOUR ---------- */
+games.c4 = (function(){
+  const ROWS = 6, COLS = 7;
+  let board = [], over = false, winner = null, stage = null;
+  const mySymbol = () => state.isHost ? 'r' : 'y';
+
+  function build(st){
+    stage = st;
+    stage.innerHTML = scoreHTML('c4') +
+      '<div class="game-status" id="c4Status">Get four in a row to win!</div>' +
+      '<div class="c4-board" id="c4Board"></div>' +
+      '<div style="text-align:center;margin-top:8px;"><button class="btn small" id="c4Reset">🔄 New game</button></div>';
+    stage.querySelector('#c4Reset').onclick = () => reset(true);
+    reset(false, false);
+  }
+
+  function reset(broadcast = true, doRender = true){
+    board = [];
+    for(let r = 0; r < ROWS; r++) board.push(Array(COLS).fill(null));
+    over = false; winner = null;
+    if(broadcast) send({ type:'c4-reset' });
+    if(doRender) render();
+    if(stage){
+      const status = stage.querySelector('#c4Status');
+      if(status) status.textContent = state.isHost ? '👉 Your turn (red)' : '⏳ Partner\'s turn…';
+    }
+  }
+
+  function drop(col){
+    if(over || !state.connected) return;
+    if(turnSymbol() !== mySymbol()) return;
+    for(let r = ROWS-1; r >= 0; r--){
+      if(!board[r][col]){
+        board[r][col] = mySymbol();
+        send({ type:'c4-drop', row: r, col, symbol: mySymbol() });
+        sfx.pop();
+        render();
+        check();
+        return;
+      }
+    }
+  }
+
+  function turnSymbol(){
+    let redCount = 0, yelCount = 0;
+    board.forEach(row => row.forEach(c => { if(c === 'r') redCount++; else if(c === 'y') yelCount++; }));
+    return redCount <= yelCount ? 'r' : 'y';
+  }
+
+  function check(){
+    const win = findWin();
+    if(win){
+      over = true; winner = win.symbol;
+      if(winner === mySymbol()){ addScore('c4','me'); sfx.win(); confetti(60); }
+      else { addScore('c4','them'); sfx.lose(); }
+      render(win.cells);
+      if(stage){
+        const status = stage.querySelector('#c4Status');
+        if(status) status.textContent = winner === mySymbol() ? '🏆 You win!' : '😅 They win!';
+      }
+      return;
+    }
+    // draw?
+    let full = true;
+    for(let r = 0; r < ROWS; r++) for(let c = 0; c < COLS; c++) if(!board[r][c]) full = false;
+    if(full){
+      over = true;
+      if(stage){
+        const status = stage.querySelector('#c4Status');
+        if(status) status.textContent = "🤝 It's a draw!";
+      }
+      return;
+    }
+    updateStatus();
+  }
+
+  function findWin(){
+    const dirs = [[0,1],[1,0],[1,1],[1,-1]];
+    for(let r = 0; r < ROWS; r++){
+      for(let c = 0; c < COLS; c++){
+        const v = board[r][c];
+        if(!v) continue;
+        for(const [dr, dc] of dirs){
+          const cells = [[r,c]];
+          let ok = true;
+          for(let k = 1; k < 4; k++){
+            const nr = r + dr*k, nc = c + dc*k;
+            if(nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS || board[nr][nc] !== v){ ok = false; break; }
+            cells.push([nr,nc]);
+          }
+          if(ok) return { symbol: v, cells };
+        }
+      }
+    }
+    return null;
+  }
+
+  function updateStatus(){
+    if(!stage) return;
+    const status = stage.querySelector('#c4Status');
+    if(status) status.textContent = turnSymbol() === mySymbol() ? '👉 Your turn (' + (mySymbol() === 'r' ? 'red' : 'yellow') + ')' : "⏳ Partner's turn…";
+  }
+
+  function render(winCells){
+    if(!stage) return;
+    const b = stage.querySelector('#c4Board');
+    if(!b) return;
+    b.innerHTML = '';
+    for(let c = 0; c < COLS; c++){
+      const colEl = document.createElement('div');
+      colEl.className = 'c4-col';
+      colEl.style.display = 'grid';
+      colEl.style.gridTemplateRows = 'repeat(' + ROWS + ', 1fr)';
+      colEl.style.gap = '5px';
+      colEl.onclick = () => drop(c);
+      for(let r = 0; r < ROWS; r++){
+        const cell = document.createElement('div');
+        cell.className = 'c4-cell' + (board[r][c] ? ' ' + board[r][c] : '');
+        if(winCells && winCells.some(([wr, wc]) => wr === r && wc === c)) cell.classList.add('win');
+        colEl.appendChild(cell);
+      }
+      b.appendChild(colEl);
+    }
+  }
+
+  function handle(type, d){
+    if(type === 'c4-drop'){
+      if(over || board[d.row][d.col]) return;
+      board[d.row][d.col] = d.symbol;
+      sfx.pop(); render(); check();
+    } else if(type === 'c4-reset'){
+      reset(false);
+    }
+  }
+
+  return { build, handle, refresh: () => { render(); updateStatus(); } };
+})();
+
+/* ============ TOP BAR ============ */
+$('#copyBtn').onclick = async () => {
+  const link = location.origin + location.pathname + '?room=' + state.code;
+  try { await navigator.clipboard.writeText(link); sysMsg('📋 Invite link copied!'); }
+  catch(e){
+    try { await navigator.clipboard.writeText(state.code); sysMsg('📋 Room code copied!'); }
+    catch(e2){ sysMsg('Your room code: ' + state.code); }
+  }
+  sfx.pop();
+};
+$('#soundBtn').onclick = function(){
+  audioOn = !audioOn;
+  this.textContent = audioOn ? '🔊' : '🔇';
+  this.classList.toggle('active', !audioOn);
+  if(audioOn) sfx.pop();
+};
+$('#themeBtn').onclick = function(){
+  document.body.classList.toggle('light');
+  const light = document.body.classList.contains('light');
+  this.textContent = light ? '☀️' : '🌙';
+  sfx.pop();
+};
+$('#leaveBtn').onclick = () => {
+  if(confirm('Leave the room?')){
+    try { state.conn && state.conn.close(); } catch(e){}
+    try { state.peer && state.peer.destroy(); } catch(e){}
+    location.href = location.origin + location.pathname;
+  }
+};
+window.addEventListener('beforeunload', () => {
+  try { state.conn && state.conn.close(); } catch(e){}
+  try { state.peer && state.peer.destroy(); } catch(e){}
+});
+
+/* ============ BOOT ============ */
+if(typeof Peer === 'undefined'){
+  lobbyStatus('⚠️ Could not load the networking library. Check your internet connection.', true);
+}
+$('#nameInput').focus();
+</script>
+</body>
+</html>
